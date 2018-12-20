@@ -1,0 +1,15 @@
+{
+    "name": "kicoephp/src",
+    "description": "a simple framework.",
+    "authors": [
+        {
+            "name": "kicoe",
+            "email": "1370808234@qq.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "kicoe\\core\\": "src/"
+        }
+    }
+}
