@@ -64,7 +64,9 @@ class Route{
             }
             // 解析路由
             $url_arr = explode('/', $url);
+            $offset = 0;
             foreach ($url_arr as $i => $key) {
+                $offset = $i;
                 $route_cache = &$route_cache[$key];
                 if ($i === count($url_arr)-1 || isset($route_cache['/']) && !isset($route_cache[$url_arr[$i+1]])) {
                     $route_cache = &$route_cache['/'];
@@ -72,7 +74,7 @@ class Route{
                 }
             }
             if (!isset($route_cache[0])) {
-                throw new Exception('route no find', $url, '..../app/config.php', '[route]');
+                throw new Exception('route no find', $url);
             }
             if (isset($route_cache[2])) {
                 self::$middleware_list = $route_cache[2];
@@ -80,7 +82,7 @@ class Route{
             self::$controller = ucfirst($route_cache[0]);
             self::$action = $route_cache[1];
             // 解析参数
-            if ($qu_arr = array_slice($url_arr, $i+1)) {
+            if ($qu_arr = array_slice($url_arr, $offset+1)) {
                 self::$query = $qu_arr;
             }
         }
@@ -108,7 +110,7 @@ class Route{
                 $ca_list[2] = $mi_list;
             }
             if (count($ca_list)<2) {
-                throw new Exception('route config export error', $value, '..../app/config.php', '[route]');
+                throw new Exception('route config export error', $value);
             }
             $route_arr = explode('/', trim($key, '/'));
             foreach ($route_arr as $v) {
@@ -126,10 +128,10 @@ class Route{
     }
 
     /**
-     * 利用反射检查
+     * 利用反射检查并执行
      * @throws
      */
-    public static function reflec()
+    public static function run()
     {
 
         $controller = 'app\controller\\'. self::$controller;
@@ -139,7 +141,7 @@ class Route{
         if (self::$middleware_list) {
             $middleware_class_name = Config::prpr('middleware');
             if (!class_exists($middleware_class_name)) {
-                throw new Exception('middleware', "{$middleware_class_name} class is not exist", 'config.php');
+                throw new Exception('middleware', "{$middleware_class_name} class is not exist");
             }
             $middleware = new $middleware_class_name();
             foreach (self::$middleware_list as $mw) {
@@ -147,7 +149,7 @@ class Route{
                     return;
                 }
                 if (!$middleware->$mw()) {
-                    throw new Exception('middleware', "{$mw} not pass", "{$controller}::{$action}");
+                    throw new Exception('middleware', "{$mw} not pass");
                 }
             }
         }
@@ -173,8 +175,15 @@ class Route{
                     $i++;
                 }
             }
+
             // 还是不用反射执行吧
-            call_user_func_array([new $controller, $action], $pas);
+            $result = call_user_func_array([new $controller, $action], $pas);
+
+            if (is_string($result)) {
+                Response::getInstance()->send($result);
+            } else if (is_array($result)) {
+                Response::getInstance()->json($result);
+            }
         }
     }
 

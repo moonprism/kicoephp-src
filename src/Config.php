@@ -11,7 +11,7 @@ class Config
     /**
      * 加载配置文件初始化
      * @param $path string 配置文件路径
-     * @throws \kicoe\Core\Exception
+     * @throws
      */
     public static function load($path)
     {
@@ -26,7 +26,7 @@ class Config
      * 解析配置文件
      * @param string $type 配置项
      * @return array 配置信息
-     * @throws \kicoe\Core\Exception
+     * @throws
      */
     public static function prpr($type)
     {

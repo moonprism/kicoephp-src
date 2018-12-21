@@ -19,13 +19,13 @@ class Moo
     // where语句
     protected $where = '';
     // 保存的order by语句
-    protected $Order_by = '';
+    protected $order_by = '';
     // 保存的LIMIT语句
     protected $limit = '';
     // 保存的pdo参数绑定数据
-    protected $Pdo_bind_data = array();
+    protected $pdo_bind_data = array();
     // 保存的pdo参数绑定计数
-    protected $Pdo_bind_count = 0;
+    protected $pdo_bind_count = 0;
 
     /**
      * 重置初始变量
@@ -34,10 +34,10 @@ class Moo
     {
         $this->statement = '';
         $this->where = '';
-        $this->Order_by = '';
+        $this->order_by = '';
         $this->limit = '';
-        $this->Pdo_bind_data = array();
-        $this->Pdo_bind_count = 0;
+        $this->pdo_bind_data = array();
+        $this->pdo_bind_count = 0;
     } 
 
     /**
@@ -57,9 +57,9 @@ class Moo
     protected function pdoBind($pre, $data)
     {
         $pre_name = ':'.$pre;
-        $this->Pdo_bind_count++;
-        $this->Pdo_bind_data[ $pre_name. $this->Pdo_bind_count] = $data;
-        return $pre_name.$this->Pdo_bind_count;
+        $this->pdo_bind_count++;
+        $this->pdo_bind_data[ $pre_name. $this->pdo_bind_count] = $data;
+        return $pre_name.$this->pdo_bind_count;
     }
 
     /**
@@ -78,26 +78,27 @@ class Moo
             $start_where = ' '.$in.' ';
         }
         if ($arg3 === false) {
-            $creat_where = '`'.$arg1.'` = '.$this->pdoBind('wh', $arg2);
+            $create_where = '`'.$arg1.'` = '.$this->pdoBind('wh', $arg2);
         } else {
             $sign = strtolower($arg2);
             if (in_array($sign, ['=','!=','<>','<','>','<=','>=','like','not like'])) {
-                $creat_where = '`'.$arg1.'` '.$arg2.' '. $this->pdoBind('wh', $arg3);
+                $create_where = '`'.$arg1.'` '.$arg2.' '. $this->pdoBind('wh', $arg3);
             } elseif ( $sign === 'in' || $sign === 'not in' ) {
                 // IN 与 NOT IN 处理
                 $in_arr = [];
                 foreach ($arg3 as $in_key => $in_val) {
                     $in_arr[] = ' '.$this->pdoBind('wh', $in_val);
                 }
-                $creat_where = '`'.$arg1.'` '.$arg2.' ('. implode(',', $in_arr).')';
+                $create_where = '`'.$arg1.'` '.$arg2.' ('. implode(',', $in_arr).')';
             } elseif ( $sign === 'between' || $sign === 'not between' ) {
                 // BETWEEN 处理
-                $creat_where = '`'.$arg1.'` '.$arg2.' '.$this->pdoBind('wh', $arg3[0]).' and '.$this->pdoBind('wh', $arg3[1]);
+                $create_where = '`'.$arg1.'` '.$arg2.' '.
+                    $this->pdoBind('wh', $arg3[0]).' and '.$this->pdoBind('wh', $arg3[1]);
             } else {
-                throw new Exception('不允许的sql符号', "sql : <b>{$arg2}</b>");
+                throw new Exception('sql', "invalid token {$arg2}");
             }
         }
-        $this->where .= ($start_where.$creat_where);
+        $this->where .= ($start_where.$create_where);
     }
       
     /**
@@ -110,10 +111,10 @@ class Moo
     {
         $type = strtolower($type);
         if ($type === 'asc' || $type === 'desc') {
-            if ($this->Order_by === '') {
-                $this->Order_by = ' order by '.$by.' '.$type;
+            if ($this->order_by === '') {
+                $this->order_by = ' order by '.$by.' '.$type;
             } else {
-                $this->Order_by .= (', '.$by.' '.$type);
+                $this->order_by .= (', '.$by.' '.$type);
             }
         }
         return $this;
@@ -150,7 +151,7 @@ class Moo
         } else {
             $select = 'select '.$data;
         }
-        $this->statement = $select.' from '.$this->table.' '.$this->where.$this->Order_by.$this->limit;
+        $this->statement = $select.' from '.$this->table.' '.$this->where.$this->order_by.$this->limit;
         if ($key) {
             return $this->bindPrpr()->fetchAll(\PDO::FETCH_UNIQUE | \PDO::FETCH_ASSOC);
         } else {
@@ -166,7 +167,7 @@ class Moo
     public function delete()
     {
         //没有执行where就delete,则删除全部表
-        $this->statement = 'delete from `'.$this->table.'` '.$this->where.$this->Order_by.$this->limit;
+        $this->statement = 'delete from `'.$this->table.'` '.$this->where.$this->order_by.$this->limit;
         return $this->bindPrpr()->rowCount();
     }
 
@@ -218,7 +219,7 @@ class Moo
         }
         $update = implode(',', $fields);
         # 没有where的话,修改所有数据
-        $this->statement = 'update `'.$this->table."` set $update ".$this->where.$this->Order_by.$this->limit;
+        $this->statement = 'update `'.$this->table."` set $update ".$this->where.$this->order_by.$this->limit;
         return $this->bindPrpr()->rowCount();
     }
 
@@ -231,8 +232,8 @@ class Moo
     {
         $sta = $this->db_instance->prepare($this->statement);
 
-        if (count($this->Pdo_bind_data)) {
-            foreach ($this->Pdo_bind_data as $key => $value) {
+        if (count($this->pdo_bind_data)) {
+            foreach ($this->pdo_bind_data as $key => $value) {
                 if (is_numeric($value)) {
                     $sta->bindValue($key,$value,\PDO::PARAM_INT);
                 } else {

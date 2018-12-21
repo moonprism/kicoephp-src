@@ -67,19 +67,4 @@ class Response
         $this->header('Location', $url);
     }
 
-    /**
-     * 宕机
-     * @param $code
-     * @param $info
-     */
-    public function shutdown($code, $info = NULL)
-    {
-        if (is_string($info)) {
-            $this->status($code)->send($info);
-        } else {
-            $this->status($code)->json($info);
-        }
-        die();
-    }
-
 }

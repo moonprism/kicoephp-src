@@ -36,7 +36,7 @@ class Request
         if ($k = $this->get('k')) {
             Route::init($k);
         }
-        Route::reflec();
+        Route::run();
     }
 
     /** 

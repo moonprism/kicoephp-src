@@ -1,5 +1,5 @@
 <?php
-// 自定义异常类
+// 这个文件 满是异常
 
 namespace kicoe\core;
 
@@ -17,10 +17,16 @@ class Exception extends \Exception
 
     // custom error page html head
     protected $ex_tpl_head = '
-        <link rel="stylesheet" type="text/css" href="/static/css/main.css">
         <style>
             .er { width:400px;margin:60px auto; }
-            .er div span{ display:block; padding:15px 10px; font-size:14px; color:#FF4040; box-shadow: 0px 1px 0px #ddd;letter-spacing: 1px; }
+            .er div span{ 
+                display:block; 
+                padding:15px 10px; 
+                font-size:14px; 
+                color:#FF4040; 
+                box-shadow: 0px 1px 0px #ddd;
+                letter-spacing: 1px; 
+               }
             .er div p{ padding:5px 12px; }
             em{ font-family:"MS Gothic"; display:block;text-align:center;margin-bottom:16px; }
         </style>
@@ -76,7 +82,7 @@ class Exception extends \Exception
                 $this->ex_tpl_end,
                 $this->ex_type,
                 $this->message,
-                substr($this->file, strlen(substr(CORE_PATH, 0, -6))),
+                $this->file,
                 $this->line
             )
         );

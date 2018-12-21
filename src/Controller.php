@@ -52,10 +52,4 @@ class Controller
         $this->view->json($data);
     }
 
-
-    protected function shutdown($code = 500, $str = '')
-    {
-        Response::getInstance()->shutdown($code, $str);
-    }
-
 }

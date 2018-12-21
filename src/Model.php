@@ -35,7 +35,8 @@ class Model extends Moo
      * 获取当前查询结果的实例,一般都只查询一条,且立即执行查询
      * @param mixed $val 主键的值
      * @param string $pk 主键名
-     * @return 当前对象
+     * @return $this 当前对象
+     * @throws
      */
     public function get($val, $pk = 'id')
     {
@@ -49,7 +50,8 @@ class Model extends Moo
     /**
      * 和get获取不同，这里主要是构造查询语句where
      * @param array $data where中的键值对数组
-     * @return 当前对象
+     * @return $this 当前对象
+     * @throws
      */
     public function set($data = NULL)
     {
@@ -93,19 +95,18 @@ class Model extends Moo
     /**
      * 更新数据
      * @param array $data 要修改的键值对数组,为空的话用_data
-     * @return 影响行数
+     * @return int 影响行数
+     * @throws
      */
     public function update($data = NULL)
     {
         if (is_null($data)) {
             $data = $this->_data;
         }
-        parent::update($data);
+        return parent::update($data);
     }
 
-    /**
-     * DAO
-     */
+    // DAO
     public function __set($name, $value)
     {
         $this->_data[$name] = $value;
