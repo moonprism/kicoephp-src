@@ -11,6 +11,6 @@ class Load
         // register exception
         Config::prpr('test') && Error::register();
         // route
-        kicoe\Core\Request::getInstance()->route();
+        Request::getInstance()->route();
     }
 }

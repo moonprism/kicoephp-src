@@ -48,14 +48,14 @@ class Route{
         if ($route_conf === []) {
             // 配置为空则自动路由
             $k_arr = explode('/', $url);
-            self::$controller = ucfirst($k_arr[0]);
+            self::$controller = $k_arr[0];
             self::$action = $k_arr[1];
             if ( isset($k_arr[2]) ) {
                 self::$query = array_slice($k_arr,2);
             }
         } else {
             // 完全按照配置来
-            $key = 'route.cache.php';
+            $key = 'route.cache';
             if (!Config::prpr('test') && Cache::has($key)) {
                 $route_cache = Cache::read($key);
             } else {
@@ -79,7 +79,7 @@ class Route{
             if (isset($route_cache[2])) {
                 self::$middleware_list = $route_cache[2];
             }
-            self::$controller = ucfirst($route_cache[0]);
+            self::$controller = $route_cache[0];
             self::$action = $route_cache[1];
             // 解析参数
             if ($qu_arr = array_slice($url_arr, $offset+1)) {

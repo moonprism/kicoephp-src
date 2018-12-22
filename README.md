@@ -8,7 +8,7 @@
 // app path
 define('APP_PATH', __DIR__ . '/../app/');
 // autoload
-require __DIR__ . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 // link-start 
 kicoe\core\Load::link_start();
 
@@ -27,7 +27,6 @@ return [
     'route' => [
         'article/delete' => 'auth|admin/article@delete',
     ],
-    'cc'    => 'cache',
     'test'  => true,
     'middleware' => 'app\Mid'
 ];
@@ -55,3 +54,5 @@ class Mid
     }
 }
 ```
+
+`mkdir -m 755 ./storage`
