@@ -1,6 +1,6 @@
 {
     "name": "kicoephp/src",
-    "description": "a simple framework.",
+    "description": "a simple web framework.",
     "authors": [
         {
             "name": "kicoe",
@@ -9,7 +9,7 @@
     ],
     "autoload": {
         "psr-4": {
-            "kicoe\\core\\": "src/"
+            "kicoe\\core\\": "core/"
         }
     }
 }
