@@ -1,6 +1,6 @@
 <?php
 // -- 超级简单的文件缓存 
-// -- 正确的扩展做法是使用一个工厂生产文件或Redis类型的缓存对象
+// -- 扩展做法是使用一个工厂生产文件/Redis类型的缓存对象
 
 namespace kicoe\core;
 
@@ -15,7 +15,7 @@ class Cache
      */
     public static function getFile($key)
     {
-        $file = APP_PATH.Config::prpr('cc').'/'.$key;
+        $file = APP_PATH.Config::prpr('cp').'/'.$key;
         if (!is_file($file)) {
             touch($file, 0755, true);
         }

@@ -3,8 +3,8 @@
     "description": "a simple web framework.",
     "authors": [
         {
-            "name": "kicoe",
-            "email": "1370808234@qq.com"
+            "name": "moonprism",
+            "email": "ankicoe@gmail.com"
         }
     ],
     "autoload": {

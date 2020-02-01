@@ -12,5 +12,6 @@ class Load
         Config::prpr('test') && Error::register();
         // route
         Request::getInstance()->route();
+        Route::run();
     }
 }

@@ -43,8 +43,19 @@ class Route{
      */
     public static function init($url)
     {
+
         $route_conf = Config::prpr('route');
         $url = trim($url,'/');
+        if (!$url) {
+            // 路由为空则查找'/'路由
+            if (!isset($route_conf['/'])) {
+                return;
+            }
+            $def_route = explode('/', $route_conf['/']);
+            self::$controller = $def_route[0];
+            self::$action = $def_route[1];
+            return;
+        }
         if ($route_conf === []) {
             // 配置为空则自动路由
             $k_arr = explode('/', $url);
@@ -55,7 +66,7 @@ class Route{
             }
         } else {
             // 完全按照配置来
-            $key = 'route.cache';
+            $key = 'route';
             if (!Config::prpr('test') && Cache::has($key)) {
                 $route_cache = Cache::read($key);
             } else {
@@ -89,7 +100,7 @@ class Route{
     }
 
     /**
-     * 将路由配置解析为树
+     * 将路由配置解析为树, 类似前缀树，性能还是可以了
      * @param array $conf 配置数组
      * @return array 转换树结构
      * @throws
@@ -124,20 +135,20 @@ class Route{
             $in_node['/'] = $ca_list;
             $in_node = &$tree;
         }
+        
         return $tree;
     }
 
     /**
-     * 利用反射检查并执行
+     * 利用反射检查
      * @throws
      */
     public static function run()
     {
-
-        $controller = 'app\controller\\'. self::$controller;
+        $controller = 'app\controller\\'. ucfirst(self::$controller);
         $action = self::$action;
 
-        // 执行中间件
+        // 验证中间件
         if (self::$middleware_list) {
             $middleware_class_name = Config::prpr('middleware');
             if (!class_exists($middleware_class_name)) {
@@ -163,9 +174,9 @@ class Route{
             // 注入依赖
             foreach ($params as $pa) {
                 if ($class = $pa->getClass()) {
-                    if ('kicoe\Core\Request' === $class->getName()) {
+                    if ('kicoe\core\Request' === $class->getName()) {
                         $pas[] = Request::getInstance();
-                    } else if ('kicoe\Core\Response' === $class->getName()) {
+                    } else if ('kicoe\core\Response' === $class->getName()) {
                         $pas[] = Response::getInstance();
                     }
                 } else {
@@ -176,7 +187,7 @@ class Route{
                 }
             }
 
-            // 还是不用反射执行吧
+            // 不用反射执行
             $result = call_user_func_array([new $controller, $action], $pas);
 
             if (is_string($result)) {

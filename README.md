@@ -27,6 +27,7 @@ return [
     'route' => [
         'article/delete' => 'auth|admin/article@delete',
     ],
+    'cp' => 'cache',
     'test'  => true,
     'middleware' => 'app\Mid'
 ];
@@ -55,4 +56,6 @@ class Mid
 }
 ```
 
-`mkdir -m 755 ./storage`
+`mkdir -m 755 ./cache`
+
+> 详细文档参照 [kicoephp](https://github.com/kicoer/kicoephp)

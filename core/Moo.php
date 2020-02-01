@@ -1,10 +1,10 @@
 <?php
 // 数据查询的父类
 
-namespace kicoe\core\secret;
+namespace kicoe\core;
 
-use kicoe\Core\Exception;
-use kicoe\Core\Db;
+use kicoe\core\Exception;
+use kicoe\core\Db;
 
 class Moo
 {

@@ -33,10 +33,7 @@ class Request
      */
     public function route()
     {
-        if ($k = $this->get('k')) {
-            Route::init($k);
-        }
-        Route::run();
+        Route::init($this->get('k'));
     }
 
     /** 
@@ -46,12 +43,22 @@ class Request
     {
         return Route::getController();
     }
+
     /**
      * 获取动作名
      */
     public function getAction()
     {
         return Route::getAction();
+    }
+
+    /**
+     * 获取请求方法
+     * @return mixed
+     */
+    public function getMethod()
+    {
+        return $_SERVER['REQUEST_METHOD'];
     }
 
     /**

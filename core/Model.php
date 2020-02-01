@@ -3,8 +3,6 @@
 
 namespace kicoe\core;
 
-use kicoe\core\secret\Moo;
-
 class Model extends Moo
 {
     // 类名

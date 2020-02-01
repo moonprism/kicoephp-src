@@ -1,5 +1,5 @@
 <?php
-// 这个文件 满是异常
+// 异常展示
 
 namespace kicoe\core;
 
@@ -18,17 +18,23 @@ class Exception extends \Exception
     // custom error page html head
     protected $ex_tpl_head = '
         <style>
-            .er { width:400px;margin:60px auto; }
+            .er { width:440px;margin:120px auto; }
             .er div span{ 
-                display:block; 
-                padding:15px 10px; 
-                font-size:14px; 
-                color:#FF4040; 
-                box-shadow: 0px 1px 0px #ddd;
+                display: block; 
+                padding: 10px; 
+                font-size: 17px;
+                color: #858585;
+                box-shadow: 0px 1px 0px #dedede;
                 letter-spacing: 1px; 
                }
-            .er div p{ padding:5px 12px; }
+            .er div p{ padding: 0 12px; }
             em{ font-family:"MS Gothic"; display:block;text-align:center;margin-bottom:16px; }
+            .type {
+                color: #FF4040;
+                text-align: center;
+                font-size: 20px;
+                margin-bottom: 15px;
+            }
         </style>
     ';
 
@@ -36,10 +42,10 @@ class Exception extends \Exception
         </head>
         <body>
         <div class="er">
-            <div class="type"> <span> type </span> <p>%s</p> </div>
-            <div class="info"> <span> info </span> <p>%s</p> </div>
-            <div class="file"> <span> file </span> <p>%s</p> </div>
-            <div class="line"> <span> line </span> <p>%s</p> </div>
+            <div class="type"> %s </div>
+            <div class="info"> <span> Info </span> <p>%s</p> </div>
+            <div class="file"> <span> File </span> <p>%s</p> </div>
+            <div class="line"> <span> Line </span> <p>%s</p> </div>
         </div>
         </body>
         </html>
