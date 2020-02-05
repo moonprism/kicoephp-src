@@ -77,10 +77,14 @@ class Moo
         } else {
             $start_where = ' '.$in.' ';
         }
+        $sign = strtolower($arg2);
         if ($arg3 === false) {
-            $create_where = '`'.$arg1.'` = '.$this->pdoBind('wh', $arg2);
+            if (in_array($sign, ['is null', 'not null'])) {
+                $create_where = '`'.$arg1.'` '.$arg2;
+            } else {
+                $create_where = '`'.$arg1.'` = '.$this->pdoBind('wh', $arg2);
+            }
         } else {
-            $sign = strtolower($arg2);
             if (in_array($sign, ['=','!=','<>','<','>','<=','>=','like','not like'])) {
                 $create_where = '`'.$arg1.'` '.$arg2.' '. $this->pdoBind('wh', $arg3);
             } elseif ( $sign === 'in' || $sign === 'not in' ) {
