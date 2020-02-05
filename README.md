@@ -1,5 +1,11 @@
 # kicoephp-src
 
+## Install
+
+```
+composer install kicoephp/src
+```
+
 ## Dash
 
 `./public/index.php`

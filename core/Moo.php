@@ -293,7 +293,7 @@ class Moo
                 'sql',
                 implode('<br>',$sta->errorInfo()),
                 static::CLASS,
-                'sql:<br>'.$stat
+                'sql:<br>'.$sta->statement
             );
         }
 

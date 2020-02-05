@@ -4,6 +4,7 @@
 namespace kicoe\core;
 
 use \ReflectionClass;
+use kicoe\core\cache\Factory as CacheFactory;
 
 class Route{
 
@@ -45,6 +46,7 @@ class Route{
     {
 
         $route_conf = Config::prpr('route');
+        $cache = CacheFactory::getInstance(ucfirst(Config::prpr('route_cache')));
         $url = trim($url,'/');
         if (!$url) {
             // 路由为空则查找'/'路由
@@ -67,11 +69,11 @@ class Route{
         } else {
             // 完全按照配置来
             $key = 'route';
-            if (!Config::prpr('test') && Cache::has($key)) {
-                $route_cache = Cache::read($key);
+            if (!Config::prpr('test') && $cache->has($key)) {
+                $route_cache = $cache->read($key);
             } else {
                 $route_cache = self::tree($route_conf);
-                Cache::write($key, $route_cache);
+                $cache->write($key, $route_cache);
             }
             // 解析路由
             $url_arr = explode('/', $url);
@@ -171,7 +173,7 @@ class Route{
             $params = $action_ref->getParameters();
             $i = 0;
             $pas = [];
-            // 注入依赖
+            // 注入[Request\Respinse\路由参数]依赖
             foreach ($params as $pa) {
                 if ($class = $pa->getClass()) {
                     if ('kicoe\core\Request' === $class->getName()) {
