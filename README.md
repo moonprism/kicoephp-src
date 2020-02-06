@@ -33,6 +33,10 @@ return [
     'route' => [
         'article/delete' => 'auth|admin/article@delete',
     ],
+    'redis' => [
+        'host'  => 'redis',
+    ],
+    'route_cache' => 'redis',
     'cp' => 'cache',
     'test'  => true,
     'middleware' => 'app\Mid'
@@ -64,4 +68,6 @@ class Mid
 
 `mkdir -m 755 ./cache`
 
-> 详细文档参照 [kicoephp](https://github.com/kicoer/kicoephp)
+文档详细 [kicoephp](https://github.com/kicoer/kicoephp)
+
+> 代码比文档还简单

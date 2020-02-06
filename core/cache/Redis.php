@@ -23,11 +23,11 @@ class Redis implements CacheInterface
 
     public function write($key, $data)
     {
-        return $this->redis->set($key, $data, 114514);
+        return $this->redis->set($key, json_encode($data), 114514);
     }
 
     public function read($key)
     {
-        return $this->redis->get($key);
+        return json_decode($this->redis->get($key), true);
     }
 }
