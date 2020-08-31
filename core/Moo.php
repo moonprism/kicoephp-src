@@ -79,7 +79,7 @@ class Moo
         }
         $sign = strtolower($arg2);
         if ($arg3 === false) {
-            if (in_array($sign, ['is null', 'not null'])) {
+            if (in_array($sign, ['is null', 'is not null'])) {
                 $create_where = '`'.$arg1.'` '.$arg2;
             } else {
                 $create_where = '`'.$arg1.'` = '.$this->pdoBind('wh', $arg2);
