@@ -2,9 +2,7 @@
 // -- 数据库的查询构造器
 // -- 要优雅
 
-namespace kicoe\Core;
-
-use kicoe\Core\secret\Moo;
+namespace kicoe\core;
 
 class Query extends Moo
 {
