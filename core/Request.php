@@ -1,3 +1,4 @@
+
 <?php
 
 namespace kicoe\core;
@@ -26,14 +27,6 @@ class Request
             self::$_instance = new self();
         }
         return self::$_instance;
-    }
-
-    /**
-     * 注册路由处理
-     */
-    public function route()
-    {
-        Route::init($this->get('k'));
     }
 
     /** 
@@ -75,6 +68,15 @@ class Request
             $this->_get[$index] = $_GET[$index];
         }
         return $this->_get[$index];
+    }
+
+    /**
+     * 设置GET数据
+     * @param array $data 键值对
+     */
+    public function setGet($data)
+    {
+        $this->_get = $data;
     }
 
     /**
@@ -126,3 +128,4 @@ class Request
     }
 
 }
+
