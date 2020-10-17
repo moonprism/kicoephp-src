@@ -11,5 +11,10 @@
         "psr-4": {
             "kicoe\\core\\": "core/"
         }
+    },
+    "require": {
+        "php": ">=7.4",
+        "ext-json": "*",
+        "ext-redis": "*"
     }
 }
