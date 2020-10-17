@@ -45,7 +45,7 @@ class Route
     // simple service container
     protected static array $bindings = [];
 
-    public static function setCache(&$tree)
+    public static function setCache($tree)
     {
         self::$tree = $tree;
         self::$cache = true;
@@ -72,6 +72,9 @@ class Route
      */
     public static function parseAnnotation($class_name)
     {
+        if (self::$cache) {
+            return;
+        }
         try {
             $class = new \ReflectionClass($class_name);
         } catch (\ReflectionException $e) {
