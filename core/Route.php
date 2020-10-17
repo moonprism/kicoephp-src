@@ -7,6 +7,8 @@ class Route
     /**
      * 超快速的路由前缀树实现
      * example:
+     * @route get /index/{var1}
+     * @route get /index/test
      * 'GET' => [
      *   'path' => '/'
      *   'handler' => [],
@@ -30,15 +32,42 @@ class Route
      *   ]
      *   ...
      */
-    public static array $tree = [
+    protected static array $tree = [
         'GET' => [],
         'POST' => [],
         'PUT' => [],
         'DELETE' => [],
     ];
 
+    // simple cache
+    protected static bool $cache = false;
+
+    // simple service container
+    protected static array $bindings = [];
+
+    public static function setCache(&$tree)
+    {
+        self::$tree = $tree;
+        self::$cache = true;
+    }
+
+    public static function getCache()
+    {
+        return self::$tree;
+    }
+
+    public static function scBind($class_name, $instance)
+    {
+        self::$bindings[$class_name] = $instance;
+    }
+
+    public static function scMake($class_name)
+    {
+        return self::$bindings[$class_name] ?? null;
+    }
+
     /**
-     * 从控制器方法注解中解析路由
+     * 从类方法注解中解析路由
      * @param $class_name
      */
     public static function parseAnnotation($class_name)
@@ -166,7 +195,7 @@ class Route
      */
     protected static function parseTreeNode(string $path, $handler)
     {
-        preg_match_all('/({[a-zA-Z_][a-zA-Z0-9_-]*})/', $path, $matches, PREG_OFFSET_CAPTURE);
+        preg_match_all('/({.+?})/', $path, $matches, PREG_OFFSET_CAPTURE);
         $path_stack = [];
         $str_index = 0;
         foreach ($matches[1] as $param) {
@@ -174,7 +203,11 @@ class Route
             if ($str !== '') {
                 $path_stack[] = [$str[0], $str];
             }
-            $path_stack[] = ['$', substr($path, $param[1]+1, strlen($param[0])-2)];
+            $var_name = substr($path, $param[1]+1, strlen($param[0])-2);
+            if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_-]*$/', $var_name)) {
+                throw new \InvalidArgumentException(sprintf('Route to "%s": illegal variable name "%s"', $path, $var_name));
+            }
+            $path_stack[] = ['$', $var_name];
             $str_index = $param[1] + strlen($param[0]);
             if (strlen($path) > $str_index && substr($path, $str_index, 1) !== '/') {
                 throw new \InvalidArgumentException(sprintf('Route to "%s": variables must split by "/"', $path));
@@ -239,7 +272,13 @@ class Route
      */
     public static function add(string $type, string $path, $call)
     {
-        // 暂不支持闭包的路由定义
+        if (self::$cache) {
+            // if ($call instanceof \Closure) {
+            //    throw new \
+            // }
+            return;
+        }
+        // 暂不支持闭包的路由缓存
         if (is_array($call)) {
             list($class_name, $method_name) = $call;
         } else if (is_string($call)) {
@@ -323,43 +362,30 @@ class Route
             if (is_array($result['handler'])) {
                 $class_name = $result['handler'][0];
                 $method_name = $result['handler'][1];
-                try {
-                    $ref_class = new \ReflectionClass($class_name);
-                    $ref_method = $ref_class->getMethod($method_name);
-                } catch (\ReflectionException $e) {
-                }
-                self::generateCallParams($ref_method, $params);
-                $result = call_user_func_array([new $class_name, $method_name], $params);
+                $ref_class = new \ReflectionClass($class_name);
+                $ref_method = $ref_class->getMethod($method_name);
+                $callable_handler = [new $class_name, $method_name];
+                $ref_parameters = $ref_method->getParameters();
             } else {
-                try {
-                    $ref_method = new \ReflectionFunction($result['handler']);
-                } catch (\ReflectionException $e) {
-                }
-                self::generateCallParams($ref_method, $params);
-                $result = call_user_func_array($result['handler'], $params);
+                $ref_function = new \ReflectionFunction($result['handler']);
+                $callable_handler = $result['handler'];
+                $ref_parameters = $ref_function->getParameters();
             }
-            return $result;
+            $params = [];
+            foreach ($ref_parameters as $parameter) {
+                // 自动注入
+                if ($type = $parameter->getType()) {
+                    if ($instance = self::scMake($type->getName())) {
+                        $params[] = $instance;
+                    }
+                } else {
+                    if ($param = $result['params'][$parameter->getName()] ?? false) {
+                        $params[] = $param;
+                    }
+                }
+            }
+            return call_user_func_array($callable_handler, $params);
         }
         return null;
-    }
-
-    protected static function generateCallParams(\ReflectionFunction $ref_method, &$params)
-    {
-        $params = [];
-        $ref_params = $ref_method->getParameters();
-        foreach ($ref_params as $rp) {
-            // 自动注入
-            if ($type = $rp->getType()) {
-                switch ($type->getName()) {
-                    case '':
-                        // $params[] = xx.getInstance();
-                        break;
-                }
-            } else {
-                if ($param = $result['params'][$rp->getName()] ?? false) {
-                    $params[] = $param;
-                }
-            }
-        }
     }
 }
