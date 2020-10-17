@@ -4,46 +4,61 @@ namespace kicoe\core;
 
 class Link
 {
-    private bool $is_flush_route_cache = false;
+    protected bool $is_flush_route_cache = false;
 
-    public function __construct($app_config = [])
+    public function __construct($conf = [])
     {
         // 读取配置信息
-        $config = Config::getInstance();
-        $config->init([
-            'cache' => true,
-            'redis' => [
-                'host' => 'localhost',
-            ],
-            'mysql' => [
+        $config = new Config($conf);
 
-            ],
-            'annotation_space' => [
-
-            ],
-        ]);
+        $cache = new Cache(
+            $config->get('redis.host'),
+            $config->get('redis.port')
+        );
 
         if ($config->get('cache')) {
-            if ($route_tree = Cache::getInstance()->getArr('s:route')) {
+            // return []
+            if ($route_tree = $cache->getArr('s:route')) {
                 Route::setCache($route_tree);
             } else {
                 $this->is_flush_route_cache = true;
             }
         }
-        // 生成 Request 对象
 
-        // 注入 Config Cache Request Response
+        // 注入 Config Cache
+        Route::scBind(Config::class, $config);
+        Route::scBind(Cache::class, $cache);
     }
 
 
     public function start()
     {
-        // 路由执行
+        // 注入 Request Response
+        $request = new Request();
+        $response = new Response();
+        Route::scBind(Request::class, $request);
+        Route::scBind(Response::class, $response);
 
+        // 路由执行
         if ($this->is_flush_route_cache) {
-            Cache::getInstance()->setArr('s:route', Route::getCache());
+            /**
+             * @var $cache Cache
+             */
+            $cache = Route::scMake(Cache::class);
+            $cache->setArr('s:route', Route::getCache());
         }
+
+        $res = Route::searchAndExecute($request->path());
+
         // 处理返回结果
+        if ($res instanceof Response) {
+            $response = $res;
+        } else if (is_array($res)) {
+            $response->json($res);
+        } else {
+            $response->text($res);
+        }
+        $response->send();
     }
 
     /**

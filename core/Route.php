@@ -51,7 +51,7 @@ class Route
         self::$cache = true;
     }
 
-    public static function getCache()
+    public static function getCache():array
     {
         return self::$tree;
     }
@@ -150,7 +150,7 @@ class Route
                         // 变量直接匹配
                         $var_end_pos = strpos($str, '}');
                         if (!$var_end_pos) {
-                            throw new \InvalidArgumentException(sprintf('Route to "%s": variables definition not end', $path));
+                            throw new \InvalidArgumentException(sprintf('Route to "%s": variable definition not end', $path));
                         }
                         $res = $node;
                         $str = substr($str, $var_end_pos+1);
@@ -196,7 +196,7 @@ class Route
      * @param $handler
      * @return array [ 'k', node ]
      */
-    protected static function parseTreeNode(string $path, $handler)
+    protected static function parseTreeNode(string $path, $handler):array
     {
         preg_match_all('/({.+?})/', $path, $matches, PREG_OFFSET_CAPTURE);
         $path_stack = [];
@@ -243,7 +243,7 @@ class Route
      * @param array $children
      * @return array node
      */
-    protected static function generateTreeNode(string $path, array $handler, array $children)
+    protected static function generateTreeNode(string $path, array $handler, array $children):array
     {
         return compact('path', 'handler', 'children');
     }
@@ -304,7 +304,7 @@ class Route
      * @param string $type
      * @return array 返回一个可供执行的 info
      */
-    public static function search($path, $type = 'GET')
+    public static function search($path, $type = 'GET'):array
     {
         $res = self::$tree[$type];
         $str = trim($path, '/');
@@ -389,6 +389,7 @@ class Route
             }
             return call_user_func_array($callable_handler, $params);
         }
-        return null;
+        // todo
+        throw new \InvalidArgumentException('404 not found');
     }
 }

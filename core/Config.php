@@ -2,13 +2,14 @@
 
 namespace kicoe\core;
 
-use kicoe\core\traits\Singleton;
-
 class Config
 {
-    use Singleton;
-
     protected array $config = [];
+
+    public function __construct($conf)
+    {
+        $this->config = $conf;
+    }
 
     public function get(string $key = '')
     {
@@ -34,10 +35,5 @@ class Config
             $c = &$c[$k];
         }
         $c = $value;
-    }
-
-    public function init($value)
-    {
-        $this->config = $value;
     }
 }
