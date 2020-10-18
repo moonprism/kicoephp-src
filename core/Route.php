@@ -2,6 +2,10 @@
 
 namespace kicoe\core;
 
+use ReflectionClass;
+use ReflectionException;
+use ReflectionFunction;
+
 class Route
 {
     /**
@@ -56,14 +60,14 @@ class Route
         return self::$tree;
     }
 
-    public static function scBind($class_name, $instance)
+    public static function scBind($name, $instance)
     {
-        self::$bindings[$class_name] = $instance;
+        self::$bindings[$name] = $instance;
     }
 
-    public static function scMake($class_name)
+    public static function scMake($name)
     {
-        return self::$bindings[$class_name] ?? null;
+        return self::$bindings[$name] ?? null;
     }
 
     /**
@@ -76,8 +80,8 @@ class Route
             return;
         }
         try {
-            $class = new \ReflectionClass($class_name);
-        } catch (\ReflectionException $e) {
+            $class = new ReflectionClass($class_name);
+        } catch (ReflectionException $e) {
             throw new \InvalidArgumentException(sprintf('Class "%s" does not exist.', $class_name));
         }
 
@@ -281,7 +285,7 @@ class Route
             // }
             return;
         }
-        // 暂不支持闭包的路由缓存
+        // 暂不支持缓存闭包
         if (is_array($call)) {
             list($class_name, $method_name) = $call;
         } else if (is_string($call)) {
@@ -289,11 +293,13 @@ class Route
         } else if ($call instanceof \Closure) {
             self::addRoute($type, $path, $call);
             return;
+        } else {
+            return;
         }
         try {
-            $ref_class = new \ReflectionClass($class_name);
+            $ref_class = new ReflectionClass($class_name);
             $ref_method = $ref_class->getMethod($method_name);
-        } catch (\ReflectionException $e) {
+        } catch (ReflectionException $e) {
             throw new \InvalidArgumentException(sprintf('Class "%s" or Function "%s" does not exist.', $class_name, $method_name));
         }
         self::addRoute($type, $path, [$ref_class->getName(), $ref_method->getName()]);
@@ -358,6 +364,11 @@ class Route
         return [];
     }
 
+    /**
+     * @param mixed ...$p ($path, $type)
+     * @return mixed
+     * @throws ReflectionException
+     */
     public static function searchAndExecute(...$p)
     {
         $result = self::search(...$p);
@@ -365,12 +376,12 @@ class Route
             if (is_array($result['handler'])) {
                 $class_name = $result['handler'][0];
                 $method_name = $result['handler'][1];
-                $ref_class = new \ReflectionClass($class_name);
+                $ref_class = new ReflectionClass($class_name);
                 $ref_method = $ref_class->getMethod($method_name);
                 $callable_handler = [new $class_name, $method_name];
                 $ref_parameters = $ref_method->getParameters();
             } else {
-                $ref_function = new \ReflectionFunction($result['handler']);
+                $ref_function = new ReflectionFunction($result['handler']);
                 $callable_handler = $result['handler'];
                 $ref_parameters = $ref_function->getParameters();
             }
@@ -379,38 +390,24 @@ class Route
                 // 自动注入
                 $name = $parameter->getName();
                 $type = $parameter->getType();
+                // string? 实际不可能会有空字符串参数
+                // 但在多路由情况下期望剩余参数可以使用默认值
+                $value = $result['params'][$name] ?? false;
                 if ($type instanceof \ReflectionNamedType) {
                     $type_name = $type->getName();
-                    // 注入手动绑定的类型
                     if ($instance = self::scMake($type_name)) {
+                        if ($instance instanceof \Closure) {
+                            if ($value) {
+                                $call_params[] = call_user_func($instance, $value);
+                            }
+                            continue;
+                        }
                         $call_params[] = $instance;
                         continue;
-                    } else if ($value = $result['params'][$name] ?? false) {
-                        switch ($type_name) {
-                            case 'int':
-                                $call_params[] = (int)$value;
-                                continue 2;
-                            case 'float':
-                                $call_params[] = (float)$value;
-                                continue 2;
-                            case 'array':
-                                // 想了想还是加上吧，最好还是把这种参数放query里
-                                $call_params[] = explode(',', $value);
-                                continue 2;
-                            case 'bool':
-                                if ($value === 'true') {
-                                    $call_params[] = true;
-                                } else if ($value === 'false') {
-                                    $call_params[] = false;
-                                } else {
-                                    $call_params[] = (bool)$value;
-                                }
-                                continue 2;
-                        }
                     }
                 }
-                if (isset($result['params'][$name])) {
-                    $call_params[] = $result['params'][$name];
+                if ($value) {
+                    $call_params[] = $value;
                 }
             }
             return call_user_func_array($callable_handler, $call_params);

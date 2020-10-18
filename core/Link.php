@@ -11,29 +11,45 @@ class Link
         // 读取配置信息
         $config = new Config($conf);
 
-        $cache = new Cache(
-            $config->get('redis.host'),
-            $config->get('redis.port')
-        );
-
-        if ($config->get('cache')) {
-            // return []
-            if ($route_tree = $cache->getArr('s:route')) {
-                Route::setCache($route_tree);
-            } else {
-                $this->is_flush_route_cache = true;
+        // Config & Cache 绑定
+        if ($redis_conf = $config->get('redis')) {
+            $cache = new Cache($redis_conf);
+            if ($config->get('cache')) {
+                // return []
+                if ($route_tree = $cache->getArr('s:route')) {
+                    Route::setCache($route_tree);
+                } else {
+                    $this->is_flush_route_cache = true;
+                }
             }
+            Route::scBind(Cache::class, $cache);
         }
-
-        // 注入 Config Cache
         Route::scBind(Config::class, $config);
-        Route::scBind(Cache::class, $cache);
+
+        // 基础类型绑定
+        Route::scBind('int', function ($value) {
+            return (int)$value;
+        });
+        Route::scBind('float', function ($value) {
+            return (float)$value;
+        });
+        Route::scBind('array', function ($value) {
+            return explode(',', $value);
+        });
+        Route::scBind('bool', function ($value) {
+            if ($value === 'true') {
+                return true;
+            } else if ($value === 'false') {
+                return false;
+            }
+            return (bool)$value;
+        });
     }
 
 
     public function start()
     {
-        // 注入 Request Response
+        // Request Response 绑定
         $request = new Request();
         $response = new Response();
         Route::scBind(Request::class, $request);
@@ -47,7 +63,6 @@ class Link
             $cache = Route::scMake(Cache::class);
             $cache->setArr('s:route', Route::getCache());
         }
-
         $res = Route::searchAndExecute($request->path());
 
         // 处理返回结果
@@ -69,5 +84,15 @@ class Link
     public function route(string $path, $call, string $type = 'get')
     {
         Route::add($type, $path, $call);
+    }
+
+    public function make(string $name)
+    {
+        return Route::scMake($name);
+    }
+
+    public function bind(string $name, $instance)
+    {
+        Route::scBind($name, $instance);
     }
 }

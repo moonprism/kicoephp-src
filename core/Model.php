@@ -4,7 +4,7 @@ namespace kicoe\core;
 
 class Model
 {
-    protected $connection;
+    protected DB $db;
 
     protected string $table = '';
     protected string $primary_key = 'id';

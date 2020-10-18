@@ -9,19 +9,27 @@ use Redis;
  * @package kicoe\core
  * @method string get(string $key, ...$redis_same)
  * @method string set(string $key, ...$redis_same)
- * Redis专用
+ * redis 专用
  */
 class Cache
 {
     const CACHE_PREFIX = 'aqua:';
 
-    public Redis|null $redis = null;
+    /**
+     * @var Redis|null
+     * public Redis|null $redis = null;
+     */
+    public ?Redis $redis = null;
 
-    protected array $connect_arguments = [];
+    protected array $redis_conf = [
+        'host' => '127.0.0.1',
+        'port' => 6379,
+        'timeout' => 0
+    ];
 
-    public function __construct(string $host = '127.0.0.1', int $port = 6379)
+    public function __construct($conf)
     {
-        $this->connect_arguments = [$host, $port];
+        $this->redis_conf += $conf;
     }
 
     /**
@@ -32,7 +40,7 @@ class Cache
     {
         if ($this->redis === null) {
             $this->redis = new Redis();
-            $this->redis->connect(...$this->connect_arguments);
+            $this->redis->connect(...array_values($this->redis_conf));
         }
         return $this->redis;
     }
@@ -42,19 +50,19 @@ class Cache
         return self::CACHE_PREFIX.$key;
     }
 
-    public function __call($name, $arguments)
+    public function __call($name, $args)
     {
-        $arguments[0] = $this->realKey($arguments[0]);
-        return $this->redisCase()->$name(...$arguments);
+        $args[0] = $this->realKey($args[0]);
+        return $this->redisCase()->$name(...$args);
     }
 
-    public function getArr($key, ...$arguments)
+    public function getArr($key, ...$args)
     {
-        return json_decode($this->get($key, ...$arguments), true);
+        return json_decode($this->get($key, ...$args), true);
     }
 
-    public function setArr($key, $value, ...$arguments)
+    public function setArr($key, $value, ...$args)
     {
-        return $this->set($key, json_encode($value), ...$arguments);
+        return $this->set($key, json_encode($value), ...$args);
     }
 }
