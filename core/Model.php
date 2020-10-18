@@ -15,16 +15,18 @@ class Model
      */
     protected bool $timestamps = false;
 
-    public function __construct()
+    public function __construct($table = '')
     {
-        if ($this->table === '') {
-            // 默认表名和类名一致
-            $this->table = strtolower(substr(static::class, strripos(static::class, '\\')+1));
-        }
+        $this->table = $table ?: self::defaultTableName();
     }
 
-    public function all()
+    public static function defaultTableName()
     {
+        return strtolower(substr(static::class, strripos(static::class, '\\')+1));
+    }
 
+    public static function all()
+    {
+        return DB::getInstance()->fetchClassAll(new SQL('select * from '.self::defaultTableName()), self::class);
     }
 }

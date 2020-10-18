@@ -11,7 +11,6 @@ class Link
         // 读取配置信息
         $config = new Config($conf);
 
-        // Config & Cache 绑定
         if ($redis_conf = $config->get('redis')) {
             $cache = new Cache($redis_conf);
             if ($config->get('cache')) {
@@ -24,28 +23,25 @@ class Link
             }
             Route::scBind(Cache::class, $cache);
         }
+
+        if ($mysql_conf = $config->get('mysql')) {
+            DB::setInstance(new DB($mysql_conf));
+            Route::scBind(DB::class, DB::getInstance());
+        }
+
         Route::scBind(Config::class, $config);
 
         // 基础类型绑定
-        Route::scBind('int', function ($value) {
+        Route::scBind('int', function (string $value) {
             return (int)$value;
         });
-        Route::scBind('float', function ($value) {
+        Route::scBind('float', function (string $value) {
             return (float)$value;
         });
-        Route::scBind('array', function ($value) {
+        Route::scBind('array', function (string $value) {
             return explode(',', $value);
         });
-        Route::scBind('bool', function ($value) {
-            if ($value === 'true') {
-                return true;
-            } else if ($value === 'false') {
-                return false;
-            }
-            return (bool)$value;
-        });
     }
-
 
     public function start()
     {
@@ -63,17 +59,22 @@ class Link
             $cache = Route::scMake(Cache::class);
             $cache->setArr('s:route', Route::getCache());
         }
-        $res = Route::searchAndExecute($request->path());
-
-        // 处理返回结果
-        if ($res instanceof Response) {
-            $response = $res;
-        } else if (is_array($res)) {
-            $response->json($res);
+        $search_res = Route::search($request->path());
+        if ($search_res !== []) {
+            $request->setRouteParams($search_res['param_map']);
+            $res = call_user_func_array($search_res['handler'], $search_res['param_arr']);
+            if ($res instanceof Response) {
+                $response = $res;
+            } else if (is_array($res)) {
+                $response->json($res);
+            } else {
+                $response->text($res);
+            }
+            $response->send();
         } else {
-            $response->text($res);
+            $response->status(404);
+            $response->send();
         }
-        $response->send();
     }
 
     /**

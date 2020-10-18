@@ -308,7 +308,7 @@ class Route
     /**
      * @param $path
      * @param string $type
-     * @return array 返回一个可供执行的 info
+     * @return array 返回一个简单的  [handler, params, path param map]
      */
     public static function search($path, $type = 'GET'):array
     {
@@ -356,63 +356,51 @@ class Route
             break;
         }
         if ($res['handler'] !== [] && $str === '') {
-            return [
-                'handler' => $res['handler'],
-                'params' => $params
-            ];
+            return self::prepare($res['handler'], $params);
         }
         return [];
     }
 
     /**
-     * @param mixed ...$p ($path, $type)
-     * @return mixed
-     * @throws ReflectionException
+     * @param $handler
+     * @param $param_map
+     * @return array [handler, call args, path param map]
      */
-    public static function searchAndExecute(...$p)
+    public static function prepare($handler, $param_map)
     {
-        $result = self::search(...$p);
-        if ($result !== []) {
-            if (is_array($result['handler'])) {
-                $class_name = $result['handler'][0];
-                $method_name = $result['handler'][1];
-                $ref_class = new ReflectionClass($class_name);
-                $ref_method = $ref_class->getMethod($method_name);
-                $callable_handler = [new $class_name, $method_name];
-                $ref_parameters = $ref_method->getParameters();
-            } else {
-                $ref_function = new ReflectionFunction($result['handler']);
-                $callable_handler = $result['handler'];
-                $ref_parameters = $ref_function->getParameters();
-            }
-            $call_params = [];
-            foreach ($ref_parameters as $parameter) {
-                // 自动注入
-                $name = $parameter->getName();
-                $type = $parameter->getType();
-                // string? 实际不可能会有空字符串参数
-                // 但在多路由情况下期望剩余参数可以使用默认值
-                $value = $result['params'][$name] ?? false;
-                if ($type instanceof \ReflectionNamedType) {
-                    $type_name = $type->getName();
-                    if ($instance = self::scMake($type_name)) {
-                        if ($instance instanceof \Closure) {
-                            if ($value) {
-                                $call_params[] = call_user_func($instance, $value);
-                            }
-                            continue;
+        if (is_array($handler)) {
+            // [controller, method]
+            $ref_class = new ReflectionClass($handler[0]);
+            $ref_method = $ref_class->getMethod($handler[1]);
+            $handler = [new $handler[0], $handler[1]];
+            $ref_parameters = $ref_method->getParameters();
+        } else {
+            // callable
+            $ref_function = new ReflectionFunction($handler);
+            $ref_parameters = $ref_function->getParameters();
+        }
+        $param_arr = [];
+        foreach ($ref_parameters as $parameter) {
+            // 自动注入
+            $name = $parameter->getName();
+            $type = $parameter->getType();
+            if ($type instanceof \ReflectionNamedType) {
+                $type_name = $type->getName();
+                if ($instance = self::scMake($type_name)) {
+                    if ($instance instanceof \Closure) {
+                        if (isset($param_map[$name])) {
+                            $param_arr[] = call_user_func($instance, $param_map[$name]);
                         }
-                        $call_params[] = $instance;
                         continue;
                     }
-                }
-                if ($value) {
-                    $call_params[] = $value;
+                    $param_arr[] = $instance;
+                    continue;
                 }
             }
-            return call_user_func_array($callable_handler, $call_params);
+            if (isset($param_map[$name])) {
+                $param_arr[] = $param_map[$name];
+            }
         }
-        // todo
-        throw new \InvalidArgumentException('404 not found');
+        return compact('handler', 'param_arr', 'param_map');
     }
 }

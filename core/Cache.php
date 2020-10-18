@@ -29,7 +29,7 @@ class Cache
 
     public function __construct($conf)
     {
-        $this->redis_conf += $conf;
+        $this->redis_conf = array_merge($this->redis_conf, $conf);
     }
 
     /**

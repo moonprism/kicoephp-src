@@ -9,6 +9,8 @@ class Request
 
     protected string $path = '';
 
+    protected array $route_param_map = [];
+
     public function __construct()
     {
         // query
@@ -39,9 +41,17 @@ class Request
         return $_SERVER['REQUEST_METHOD'];
     }
 
-    public function path():string
+    public function path($var_name = '', $default = false)
     {
+        if ($var_name !== '') {
+            return $this->route_param_map[$var_name] ?? $default;
+        }
         return $this->path;
+    }
+
+    public function setRouteParams(array $param_map)
+    {
+        $this->route_param_map = $param_map;
     }
 
     public function query(string $key, $default = false)
