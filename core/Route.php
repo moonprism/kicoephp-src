@@ -374,20 +374,46 @@ class Route
                 $callable_handler = $result['handler'];
                 $ref_parameters = $ref_function->getParameters();
             }
-            $params = [];
+            $call_params = [];
             foreach ($ref_parameters as $parameter) {
                 // 自动注入
-                if ($type = $parameter->getType()) {
-                    if ($instance = self::scMake($type->getName())) {
-                        $params[] = $instance;
-                    }
-                } else {
-                    if ($param = $result['params'][$parameter->getName()] ?? false) {
-                        $params[] = $param;
+                $name = $parameter->getName();
+                $type = $parameter->getType();
+                if ($type instanceof \ReflectionNamedType) {
+                    $type_name = $type->getName();
+                    // 注入手动绑定的类型
+                    if ($instance = self::scMake($type_name)) {
+                        $call_params[] = $instance;
+                        continue;
+                    } else if ($value = $result['params'][$name] ?? false) {
+                        switch ($type_name) {
+                            case 'int':
+                                $call_params[] = (int)$value;
+                                continue 2;
+                            case 'float':
+                                $call_params[] = (float)$value;
+                                continue 2;
+                            case 'array':
+                                // 想了想还是加上吧，最好还是把这种参数放query里
+                                $call_params[] = explode(',', $value);
+                                continue 2;
+                            case 'bool':
+                                if ($value === 'true') {
+                                    $call_params[] = true;
+                                } else if ($value === 'false') {
+                                    $call_params[] = false;
+                                } else {
+                                    $call_params[] = (bool)$value;
+                                }
+                                continue 2;
+                        }
                     }
                 }
+                if (isset($result['params'][$name])) {
+                    $call_params[] = $result['params'][$name];
+                }
             }
-            return call_user_func_array($callable_handler, $params);
+            return call_user_func_array($callable_handler, $call_params);
         }
         // todo
         throw new \InvalidArgumentException('404 not found');

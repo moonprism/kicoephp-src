@@ -6,6 +6,7 @@ class Request
 {
     protected array $query = [];
     protected array $input = [];
+
     protected string $path = '';
 
     public function __construct()
@@ -13,19 +14,24 @@ class Request
         // query
         $url_data = parse_url($_SERVER['REQUEST_URI']);
         if ($query_str = $url_data['query'] ?? '') {
-            parse_str($query_str, $this->query);
+            parse_str(urldecode($query_str), $this->query);
             $this->input = $this->query;
         }
 
         // path
-        $this->path = $url_data['path'];
+        $this->path = urldecode($url_data['path']);
 
         // all input
-        if (substr($_SERVER['CONTENT_TYPE'], -4) === 'json') {
+        if ($this->isJson()) {
             $this->input += json_decode(file_get_contents('php://input'), true);
         } else if ($this->method() === 'POST') {
             $this->input += $_POST;
         }
+    }
+
+    public function isJson():bool
+    {
+        return substr($_SERVER['CONTENT_TYPE'], -4) === 'json';
     }
 
     public function method():string
