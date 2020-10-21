@@ -6,7 +6,7 @@ class Config
 {
     protected array $config = [];
 
-    public function __construct($conf)
+    public function __construct(array $conf)
     {
         $this->config = $conf;
     }

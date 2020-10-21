@@ -43,13 +43,10 @@ class Route
         'DELETE' => [],
     ];
 
-    // simple cache
+    // simple cache flag
     protected static bool $cache = false;
 
-    // simple service container
-    protected static array $bindings = [];
-
-    public static function setCache($tree)
+    public static function setCache(array $tree)
     {
         self::$tree = $tree;
         self::$cache = true;
@@ -60,14 +57,22 @@ class Route
         return self::$tree;
     }
 
-    public static function scBind($name, $instance)
+    // simple service container
+    protected array $bindings = [];
+
+    public function __construct(array $bindings = [])
     {
-        self::$bindings[$name] = $instance;
+        $this->bindings = $bindings;
     }
 
-    public static function scMake($name)
+    public function scBind($name, $instance)
     {
-        return self::$bindings[$name] ?? null;
+        $this->bindings[$name] = $instance;
+    }
+
+    public function scMake($name)
+    {
+        return $this->bindings[$name] ?? null;
     }
 
     /**
@@ -308,14 +313,15 @@ class Route
     /**
      * @param $path
      * @param string $type
-     * @return array 返回一个简单的  [handler, params, path param map]
+     * @return array 返回一个简单的  [handler, params]
      */
-    public static function search($path, $type = 'GET'):array
+    public static function search(string $path, string $type = 'GET'):array
     {
-        $res = self::$tree[$type];
+        $res = self::$tree[strtoupper($type)];
         $str = trim($path, '/');
         $params = [];
         //$stack = [];
+        if ($res === []) return [];
         while ($res['children'] !== [] && $str !== '') {
             $start_char = $str[0];
             if ($node = $res['children'][$start_char] ?? false) {
@@ -355,18 +361,20 @@ class Route
             }
             break;
         }
-        if ($res['handler'] !== [] && $str === '') {
-            return self::prepare($res['handler'], $params);
+        $handler = $res['handler'];
+        if ($handler !== [] && $str === '') {
+            return compact('handler', 'params');
         }
         return [];
     }
 
     /**
-     * @param $handler
+     * @param $handler [class, method] or Closure
      * @param $param_map
-     * @return array [handler, call args, path param map]
+     * @return array [handler, real_args, args_map]
+     * @throws ReflectionException
      */
-    public static function prepare($handler, $param_map)
+    public function prepare($handler, array $param_map):array
     {
         if (is_array($handler)) {
             // [controller, method]
@@ -375,7 +383,7 @@ class Route
             $handler = [new $handler[0], $handler[1]];
             $ref_parameters = $ref_method->getParameters();
         } else {
-            // callable
+            // Closure
             $ref_function = new ReflectionFunction($handler);
             $ref_parameters = $ref_function->getParameters();
         }
@@ -385,8 +393,9 @@ class Route
             $name = $parameter->getName();
             $type = $parameter->getType();
             if ($type instanceof \ReflectionNamedType) {
+                // 指定类型的变量
                 $type_name = $type->getName();
-                if ($instance = self::scMake($type_name)) {
+                if ($instance = $this->scMake($type_name)) {
                     if ($instance instanceof \Closure) {
                         if (isset($param_map[$name])) {
                             $param_arr[] = call_user_func($instance, $param_map[$name]);
@@ -401,6 +410,6 @@ class Route
                 $param_arr[] = $param_map[$name];
             }
         }
-        return compact('handler', 'param_arr', 'param_map');
+        return [$handler, $param_arr, $param_map];
     }
 }

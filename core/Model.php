@@ -2,22 +2,45 @@
 
 namespace kicoe\core;
 
+/**
+ * Class Model
+ * @package kicoe\core
+ *
+ * @method self where(string $segment, ...$params)
+ * @method self orderBy(...$params)
+ * @method self limit(...$params)
+ * @method self join(...$params)
+ * @method self columns(...$params)
+ * @method self addColumns(...$params)
+ * @method self removeColumns(...$params)
+ * @method self from(string $table)
+ * @method array get(...$params)
+ * @method self first()
+ * @method self groupBy(string $segment)
+ * @method int save()
+ * @method int count()
+ * @method int delete()
+ * @method static int update(array $data)
+ * @method static int insert(...$data)
+ * @method static self fetchById($id)
+ */
 class Model
 {
-    protected DB $db;
+    protected ?SQL $sql = null;
 
-    protected string $table = '';
+    protected string $_table = '';
     protected string $primary_key = 'id';
 
-    /**
-     * todo
-     * @var bool 自动设置 created_at 与 update_at
-     */
-    protected bool $timestamps = false;
+    protected array $_old_data = [];
 
-    public function __construct($table = '')
+    public function __construct(string $table = '')
     {
-        $this->table = $table ?: self::defaultTableName();
+        $this->_table = $table ?: self::defaultTableName();
+    }
+
+    public function getPrimaryKey()
+    {
+        return $this->primary_key;
     }
 
     public static function defaultTableName()
@@ -25,8 +48,28 @@ class Model
         return strtolower(substr(static::class, strripos(static::class, '\\')+1));
     }
 
-    public static function all()
+    public static function __callStatic(string $name, $args)
     {
-        return DB::getInstance()->fetchClassAll(new SQL('select * from '.self::defaultTableName()), self::class);
+        return call_user_func_array([new static(static::defaultTableName()), $name], $args);
+    }
+
+    public function __call(string $name, $args)
+    {
+        $res = call_user_func_array([$this->sql(), $name], $args);
+        if ($res !== null) {
+            return $res;
+        }
+        return $this;
+    }
+
+    public function sql():SQL
+    {
+        if ($this->sql === null) {
+            $this->sql = new SQL();
+            $this->sql->from($this->_table);
+            $this->sql->setClass(static::class);
+            $this->sql->setObj($this);
+        }
+        return $this->sql;
     }
 }

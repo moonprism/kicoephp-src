@@ -25,9 +25,9 @@ class Request
 
         // all input
         if ($this->isJson()) {
-            $this->input += json_decode(file_get_contents('php://input'), true);
+            $this->input = array_merge($this->input, json_decode(file_get_contents('php://input'), true));
         } else if ($this->method() === 'POST') {
-            $this->input += $_POST;
+            $this->input = array_merge($this->input, $_POST);
         }
     }
 
@@ -41,7 +41,7 @@ class Request
         return $_SERVER['REQUEST_METHOD'];
     }
 
-    public function path($var_name = '', $default = false)
+    public function path(string $var_name = '', $default = false)
     {
         if ($var_name !== '') {
             return $this->route_param_map[$var_name] ?? $default;

@@ -37,12 +37,48 @@ class Response
         foreach ($this->header as $h) {
             \header($h);
         }
+        if ($this->view_file !== '') {
+            $view_file = $this->view_path.$this->view_file.'.php';
+            if (!file_exists($view_file)) {
+                throw new \Exception(sprintf('view file "%s" not exists', $view_file));
+            }
+            extract($this->view_vars, EXTR_SKIP);
+            include $view_file;
+            return;
+        }
         echo $this->body;
     }
 
-    public function redirect($url)
+    public function redirect(string $url)
     {
         $this->header('Location', $url);
-        $this->send();
+    }
+
+    // 把 View 类提到这
+
+    protected string $view_path = '';
+
+    protected string $view_file = '';
+
+    protected array $view_vars = [];
+
+    public function __construct(string $view_path = '')
+    {
+        $this->view_path = $view_path;
+    }
+
+    public function view(string $path, array $vars = [])
+    {
+        $this->view_file = $path;
+        if ($vars !== []) {
+            $this->view_vars = $vars;
+        }
+        return $this;
+    }
+
+    public function with(array $vars = [])
+    {
+        $this->view_vars = $vars;
+        return $this;
     }
 }

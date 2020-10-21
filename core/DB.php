@@ -2,6 +2,8 @@
 
 namespace kicoe\core;
 
+use Closure;
+use Exception;
 use PDO;
 
 /**
@@ -26,7 +28,7 @@ class DB
         'charset' => 'utf8mb4',
     ];
 
-    public function __construct($conf)
+    public function __construct(array $conf)
     {
         $this->mysql_conf = array_merge($this->mysql_conf, $conf);
     }
@@ -45,38 +47,54 @@ class DB
         return $this->pdo;
     }
 
-    public function fetch(SQL $sql):array
+    /**
+     * @param mixed ...$param (string $sql, $bindings);
+     * @return object|false
+     */
+    public function fetch(...$param)
     {
-        return $this->execute($sql)->fetch(PDO::FETCH_OBJ);
+        return $this->execute(...$param)->fetch(PDO::FETCH_OBJ);
     }
 
-    public function fetchAll(SQL $sql):array
+    public function fetchAll(...$param):array
     {
-        return $this->execute($sql)->fetchAll(PDO::FETCH_OBJ);
+        return $this->execute(...$param)->fetchAll(PDO::FETCH_OBJ);
     }
 
-    public function fetchClass(SQL $sql, string $class)
+    public function fetchClass(string $class, ...$param)
     {
-        return $this->execute($sql)->fetch(PDO::FETCH_CLASS, $class);
+        $sth = $this->execute(...$param);
+        $sth->setFetchMode(PDO::FETCH_CLASS, $class);
+        return $sth->fetch();
     }
 
-    public function fetchClassAll(SQL $sql, string $class)
+    public function fetchClassAll(string $class, ...$param):array
     {
-        return $this->execute($sql)->fetchAll(PDO::FETCH_CLASS, $class);
+        return $this->execute(...$param)->fetchAll(PDO::FETCH_CLASS, $class);
     }
 
-    public function fetchInfo(SQL $sql, $obj)
+    public function fetchInfo($obj, ...$param)
     {
-        $ps = $this->execute($sql);
+        $ps = $this->execute(...$param);
         $ps->setFetchMode(PDO::FETCH_INTO, $obj);
-        $ps->fetch();
+        return $ps->fetch();
     }
 
-    public function execute(SQL $sql):\PDOStatement
+    protected static array $binding_type_mapping = [
+        'integer' => PDO::PARAM_INT,
+        'boolean' => PDO::PARAM_BOOL,
+        'NULL' => PDO::PARAM_NULL,
+    ];
+
+    public function execute(string $sql, array $bindings):\PDOStatement
     {
         $sth = $this->pdoCase()->prepare($sql);
-        foreach ($sql->bindings as $key => $binding) {
-            $sth->bindValue($key + 1, $binding);
+        foreach ($bindings as $key => $binding) {
+            if ($pdo_param = self::$binding_type_mapping[gettype($binding)] ?? false) {
+                $sth->bindValue($key + 1, $binding, $pdo_param);
+            } else {
+                $sth->bindValue($key + 1, $binding);
+            }
         }
         $sth->execute();
         return $sth;
@@ -84,7 +102,58 @@ class DB
 
     public static function select(string $sql, ...$bindings)
     {
-        return self::getInstance()->fetchAll(new SQL($sql, $bindings));
+        $mysql = new SQL($sql, $bindings);
+        return self::getInstance()->fetchAll($mysql, $mysql->bindings());
+    }
+
+    public static function insert(string $sql, ...$bindings)
+    {
+        $instance = self::getInstance();
+        $instance->execute($sql, $bindings);
+        return $instance->pdoCase()->lastInsertId();
+    }
+
+    public static function update(string $sql, ...$bindings):int
+    {
+        $mysql = new SQL($sql, $bindings);
+        return self::getInstance()->execute($mysql, $mysql->bindings())->rowCount();
+    }
+
+    public static function delete(string $sql, ...$bindings):int
+    {
+        $mysql = new SQL($sql, $bindings);
+        return self::getInstance()->execute($mysql, $mysql->bindings())->rowCount();
+    }
+
+    public static function beginTransaction()
+    {
+        return self::getInstance()->pdoCase()->beginTransaction();
+    }
+
+    public static function rollBack()
+    {
+        return self::getInstance()->pdoCase()->rollBack();
+    }
+
+    public static function commit()
+    {
+        return self::getInstance()->pdoCase()->commit();
+    }
+
+    /**
+     * @param Closure $closure
+     * @throws Exception
+     */
+    public static function transaction(Closure $closure)
+    {
+        self::beginTransaction();
+        try {
+            $closure();
+        } catch (Exception $e) {
+            self::rollBack();
+            throw $e;
+        }
+        self::commit();
     }
 
     public static function table(string $name):Model
@@ -92,7 +161,8 @@ class DB
         return new Model($name);
     }
 
-    // todo
+    // todo swoole 下的池化
+    // 这里主要是不想让服务容器make出来的变量都不带类型提示
     protected static ?self $instance = null;
 
     public static function setInstance(self $ins)

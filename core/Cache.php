@@ -13,7 +13,7 @@ use Redis;
  */
 class Cache
 {
-    const CACHE_PREFIX = 'aqua:';
+    protected string $prefix = 'aqua:';
 
     /**
      * @var Redis|null
@@ -45,23 +45,23 @@ class Cache
         return $this->redis;
     }
 
-    protected function realKey($key):string
+    protected function realKey(string $key):string
     {
-        return self::CACHE_PREFIX.$key;
+        return $this->prefix.$key;
     }
 
-    public function __call($name, $args)
+    public function __call(string $name, $args)
     {
         $args[0] = $this->realKey($args[0]);
         return $this->redisCase()->$name(...$args);
     }
 
-    public function getArr($key, ...$args)
+    public function getArr(string $key, ...$args)
     {
         return json_decode($this->get($key, ...$args), true);
     }
 
-    public function setArr($key, $value, ...$args)
+    public function setArr(string $key, $value, ...$args)
     {
         return $this->set($key, json_encode($value), ...$args);
     }

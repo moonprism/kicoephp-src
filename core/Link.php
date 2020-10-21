@@ -2,8 +2,13 @@
 
 namespace kicoe\core;
 
+use ReflectionClass;
+use ReflectionFunction;
+
 class Link
 {
+    protected static array $bindings = [];
+
     protected bool $is_flush_route_cache = false;
 
     public function __construct($conf = [])
@@ -14,67 +19,77 @@ class Link
         if ($redis_conf = $config->get('redis')) {
             $cache = new Cache($redis_conf);
             if ($config->get('cache')) {
-                // return []
                 if ($route_tree = $cache->getArr('s:route')) {
                     Route::setCache($route_tree);
                 } else {
                     $this->is_flush_route_cache = true;
                 }
             }
-            Route::scBind(Cache::class, $cache);
+            self::bind(Cache::class, $cache);
         }
 
         if ($mysql_conf = $config->get('mysql')) {
             DB::setInstance(new DB($mysql_conf));
-            Route::scBind(DB::class, DB::getInstance());
+            self::bind(DB::class, DB::getInstance());
         }
 
-        Route::scBind(Config::class, $config);
+        self::bind(Config::class, $config);
 
         // 基础类型绑定
-        Route::scBind('int', function (string $value) {
+        self::bind('int', function (string $value):int {
             return (int)$value;
         });
-        Route::scBind('float', function (string $value) {
+        self::bind('float', function (string $value):float {
             return (float)$value;
         });
-        Route::scBind('array', function (string $value) {
+        self::bind('array', function (string $value):array {
             return explode(',', $value);
         });
     }
 
     public function start()
     {
-        // Request Response 绑定
+        // todo
+        $this->run();
+    }
+
+    public function run()
+    {
+        $view_path = $this->make(Config::class)->get('space.view') ?? '';
         $request = new Request();
-        $response = new Response();
-        Route::scBind(Request::class, $request);
-        Route::scBind(Response::class, $response);
+        $response = new Response($view_path);
+        // merge bindings
+        $route = new Route(self::$bindings);
+        $route->scBind(Request::class, $request);
+        $route->scBind(Response::class, $response);
 
         // 路由执行
         if ($this->is_flush_route_cache) {
-            /**
-             * @var $cache Cache
-             */
-            $cache = Route::scMake(Cache::class);
+            /** @var Cache $cache */
+            $cache = $this->make(Cache::class);
             $cache->setArr('s:route', Route::getCache());
         }
-        $search_res = Route::search($request->path());
-        if ($search_res !== []) {
-            $request->setRouteParams($search_res['param_map']);
-            $res = call_user_func_array($search_res['handler'], $search_res['param_arr']);
-            if ($res instanceof Response) {
-                $response = $res;
-            } else if (is_array($res)) {
-                $response->json($res);
-            } else {
-                $response->text($res);
-            }
-            $response->send();
-        } else {
+
+        $route_res = Route::search($request->path(), $request->method());
+        if ($route_res === []) {
             $response->status(404);
             $response->send();
+            return;
         }
+
+        list($handler, $real_param, $param_map) = $route->prepare($route_res['handler'], $route_res['params']);
+        $request->setRouteParams($param_map);
+
+        $res = call_user_func_array($handler, $real_param);
+
+        if ($res instanceof Response) {
+            $response = $res;
+        } else if (is_array($res) || is_object($res)) {
+            $response->json($res);
+        } else {
+            $response->text($res);
+        }
+        $response->send();
     }
 
     /**
@@ -87,13 +102,20 @@ class Link
         Route::add($type, $path, $call);
     }
 
-    public function make(string $name)
+    public function __call(string $name, $args)
     {
-        return Route::scMake($name);
+        if ($name === 'bind' || $name === 'make') {
+            static::$name(...$args);
+        }
     }
 
-    public function bind(string $name, $instance)
+    public static function bind(string $name, $instance)
     {
-        Route::scBind($name, $instance);
+        self::$bindings[$name] = $instance;
+    }
+
+    public static function make(string $name)
+    {
+        return self::$bindings[$name] ?? null;
     }
 }
