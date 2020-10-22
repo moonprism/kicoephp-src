@@ -316,7 +316,8 @@ class SQL
     public function save()
     {
         $obj_vars = get_object_vars($this->obj);
-        if ($primary = $obj_vars[$this->obj->getPrimaryKey()] ?? false) {
+        $primary_key = $this->obj->getPrimaryKey();
+        if ($primary = $obj_vars[$primary_key] ?? false) {
             $diff_vars = array_diff($obj_vars, $this->_origin_vars);
             $this->where = '';
             $this->bindings['where'] = [];
@@ -324,7 +325,9 @@ class SQL
             $this->where($this->obj->getPrimaryKey().' = ?', $primary);
             return $this->update($diff_vars);
         } else {
-            return $this->insert([$obj_vars]);
+            $last_id = $this->insert($obj_vars);
+            $this->obj->$primary_key = $last_id;
+            return $obj_vars;
         }
     }
 
@@ -379,7 +382,7 @@ class SQL
             'values',
             implode(',', $segments)
         );
-        return DB::getInstance()->execute($this->sql, $bindings)->rowCount();
+        return DB::insert($this->sql, $bindings);
     }
 
     public function delete()

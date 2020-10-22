@@ -9,6 +9,7 @@ use Redis;
  * @package kicoe\core
  * @method string get(string $key, ...$redis_same)
  * @method string set(string $key, ...$redis_same)
+ * @method string lPush(string $key, ...$redis_same)
  * redis 专用
  */
 class Cache
