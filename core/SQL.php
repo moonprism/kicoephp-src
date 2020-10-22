@@ -37,7 +37,7 @@ class SQL
     /**
      * 非 Model 使用该类的话, eg:
      * $sql = new SQL('select * from a where id in (?) and c > ?', [$id1, $id2], 10);
-     * // $sql 会自动转换为string
+     * // $sql 可以转换为 string "select * from a where id in(?,?) and c > ?"
      * DB::execute($sql, $sql->bindings())
      * SQL constructor.
      * @param string $sql
@@ -188,8 +188,7 @@ class SQL
 
     protected function generateSqlBySegmentStack(...$segments)
     {
-        $segments = array_filter($segments);
-        return implode(' ', $segments);
+        return implode(' ', array_filter($segments));
     }
 
     /**
@@ -302,20 +301,16 @@ class SQL
         } else {
             $this->where($this->obj->getPrimaryKey()." = ?", $id);
         }
-        $bindings = $this->getBindingsAndParseSql();
-        $res = DB::getInstance()->fetchInfo($this->obj, $this->sql, $bindings);
-        $this->_origin_vars = get_object_vars($this->obj);
-        return $res;
+        return $this->first();
     }
 
     public function first()
     {
         $this->limit(1);
         $bindings = $this->getBindingsAndParseSql();
+        $res = DB::getInstance()->fetchInfo($this->obj, $this->sql, $bindings);
         $this->_origin_vars = get_object_vars($this->obj);
-        DB::getInstance()->fetchInfo($this->obj, $this->sql, $bindings);
-        $this->_origin_vars = get_object_vars($this->obj);
-        return $this->obj;
+        return $res;
     }
 
     public function save()
@@ -399,7 +394,6 @@ class SQL
                 $this->where,
             );
             $bindings = $this->getBindingsAndParseSql($this->bindings['where'], $this->sql);
-            return DB::getInstance()->execute($this->sql, $bindings)->rowCount();
         } else {
             if ($this->where === '') {
                 return 0;
@@ -412,7 +406,7 @@ class SQL
                 $this->limit
             );
             $bindings = $this->getBindingsAndParseSql(array_merge($this->bindings['where'], $this->bindings['limit']), $this->sql);
-            return DB::getInstance()->execute($this->sql, $bindings)->rowCount();
         }
+        return DB::getInstance()->execute($this->sql, $bindings)->rowCount();
     }
 }

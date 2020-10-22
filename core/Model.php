@@ -7,9 +7,13 @@ namespace kicoe\core;
  * @package kicoe\core
  *
  * @method self where(string $segment, ...$params)
+ * @method self orWhere(string $segment, ...$params)
  * @method self orderBy(...$params)
  * @method self limit(...$params)
  * @method self join(...$params)
+ * @method self leftJoin(...$params)
+ * @method self rightJoin(...$params)
+ * @method self having(...$params)
  * @method self columns(...$params)
  * @method self addColumns(...$params)
  * @method self removeColumns(...$params)

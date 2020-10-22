@@ -2,9 +2,6 @@
 
 namespace kicoe\core;
 
-use ReflectionClass;
-use ReflectionFunction;
-
 class Link
 {
     protected static array $bindings = [];
@@ -50,25 +47,27 @@ class Link
     public function start()
     {
         // todo
-        $this->run();
-    }
-
-    public function run()
-    {
         $view_path = $this->make(Config::class)->get('space.view') ?? '';
-        $request = new Request();
-        $response = new Response($view_path);
         // merge bindings
         $route = new Route(self::$bindings);
+        $request = new Request();
+        $response = new Response($view_path);
         $route->scBind(Request::class, $request);
         $route->scBind(Response::class, $response);
+        $this->run($route);
+    }
 
+    public function run(Route $route)
+    {
         // 路由执行
         if ($this->is_flush_route_cache) {
             /** @var Cache $cache */
             $cache = $this->make(Cache::class);
             $cache->setArr('s:route', Route::getCache());
         }
+
+        $request = $route->scMake(Request::class);
+        $response = $route->scMake(Response::class);
 
         $route_res = Route::search($request->path(), $request->method());
         if ($route_res === []) {
