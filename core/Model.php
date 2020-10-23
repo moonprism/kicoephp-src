@@ -5,7 +5,7 @@ namespace kicoe\core;
 /**
  * Class Model
  * @package kicoe\core
- *
+ * @method array select(...$columns)
  * @method self where(string $segment, ...$params)
  * @method self orWhere(string $segment, ...$params)
  * @method self orderBy(...$params)
@@ -18,13 +18,13 @@ namespace kicoe\core;
  * @method self addColumns(...$params)
  * @method self removeColumns(...$params)
  * @method self from(string $table)
- * @method array get(...$params)
+ * @method array get()
  * @method self first()
  * @method self groupBy(string $segment)
  * @method int save()
  * @method int count()
  * @method int delete()
- * @method static int update(array $data)
+ * @method int update(array $data)
  * @method static int insert(...$data)
  * @method static self fetchById($id)
  */

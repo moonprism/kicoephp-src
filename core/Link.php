@@ -6,15 +6,17 @@ class Link
 {
     protected static array $bindings = [];
 
-    protected bool $is_flush_route_cache = false;
+    public bool $is_flush_route_cache = false;
 
     public function __construct($conf = [])
     {
         // 读取配置信息
-        $config = new Config($conf);
+        /** @var Config $config */
+        $config = self::makeWithArgs(Config::class, $conf);
 
         if ($redis_conf = $config->get('redis')) {
-            $cache = new Cache($redis_conf);
+            /** @var Cache $cache */
+            $cache = self::makeWithArgs(Cache::class, $conf);
             if ($config->get('cache')) {
                 if ($route_tree = $cache->getArr('s:route')) {
                     Route::setCache($route_tree);
@@ -22,15 +24,13 @@ class Link
                     $this->is_flush_route_cache = true;
                 }
             }
-            self::bind(Cache::class, $cache);
         }
 
         if ($mysql_conf = $config->get('mysql')) {
-            DB::setInstance(new DB($mysql_conf));
-            self::bind(DB::class, DB::getInstance());
+            /** @var DB $db_instance */
+            $db_instance = self::makeWithArgs(DB::class, $mysql_conf);
+            DB::setInstance($db_instance);
         }
-
-        self::bind(Config::class, $config);
 
         // 基础类型绑定
         self::bind('int', function (string $value):int {
@@ -48,10 +48,11 @@ class Link
     {
         // todo
         $view_path = $this->make(Config::class)->get('space.view') ?? '';
+        // 构造专属　request response
+        $request = self::makeWithArgs(Request::class);
+        $response = self::makeWithArgs(Response::class, $view_path);
         // merge bindings
         $route = new Route(self::$bindings);
-        $request = new Request();
-        $response = new Response($view_path);
         $route->scBind(Request::class, $request);
         $route->scBind(Response::class, $response);
         $this->run($route);
@@ -108,6 +109,10 @@ class Link
         }
     }
 
+    /**
+     * @param string $name
+     * @param $instance string|object
+     */
     public static function bind(string $name, $instance)
     {
         self::$bindings[$name] = $instance;
@@ -116,5 +121,28 @@ class Link
     public static function make(string $name)
     {
         return self::$bindings[$name] ?? null;
+    }
+
+    /**
+     * 内部生成用户自定义的重载系统类, 不要直接绑定对象
+     * @param string $name
+     * @param $args
+     * @return object
+     */
+    protected static function makeWithArgs(string $name, ...$args):object
+    {
+        if ($instance = self::make($name)) {
+            if (is_string($instance) && class_exists($instance)) {
+                $class = $instance;
+                $instance = new $class(...$args);
+                self::bind($class, $instance);
+            } /** else {
+                throw new \Exception();
+            } */
+        } else {
+            $instance = new $name(...$args);
+        }
+        self::bind($name, $instance);
+        return $instance;
     }
 }

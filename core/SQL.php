@@ -37,7 +37,8 @@ class SQL
     /**
      * 非 Model 使用该类的话, eg:
      * $sql = new SQL('select * from a where id in (?) and c > ?', [$id1, $id2], 10);
-     * // $sql 可以转换为 string "select * from a where id in(?,?) and c > ?"
+     * $sql 可以转换为 string "select * from a where id in(?,?) and c > ?"
+     * $sql->bindings() : [$id1, $id2, 10]
      * DB::execute($sql, $sql->bindings())
      * SQL constructor.
      * @param string $sql
@@ -95,11 +96,6 @@ class SQL
             }
         }
         return $this->columns === [] ? '*' : implode(',', $this->columns);
-    }
-
-    public function select(...$columns)
-    {
-        $this->columns(...$columns);
     }
 
     public function where(string $segment, ...$params)
@@ -264,6 +260,12 @@ class SQL
         $this->obj = $obj;
     }
 
+    public function select(...$columns)
+    {
+        $this->columns(...$columns);
+        return $this->get();
+    }
+
     public function get()
     {
         $bindings = $this->getBindingsAndParseSql();
@@ -321,13 +323,13 @@ class SQL
             $diff_vars = array_diff($obj_vars, $this->_origin_vars);
             $this->where = '';
             $this->bindings['where'] = [];
-            $this->_origin_vars = array_merge($obj_vars, $this->_origin_vars);
+            $this->_origin_vars = array_merge($this->_origin_vars, $obj_vars);
             $this->where($this->obj->getPrimaryKey().' = ?', $primary);
             return $this->update($diff_vars);
         } else {
             $last_id = $this->insert($obj_vars);
             $this->obj->$primary_key = $last_id;
-            return $obj_vars;
+            return $last_id;
         }
     }
 
@@ -354,8 +356,7 @@ class SQL
             $this->order_by,
             $this->limit
         );
-        $bindings = $this->getBindingsAndParseSql(array_merge($bindings, $this->bindings['where'], $this->bindings['limit']), $this->sql);
-        return DB::getInstance()->execute($this->sql, $bindings)->rowCount();
+        return DB::update($this->sql, ...array_merge($bindings, $this->bindings['where'], $this->bindings['limit']));
     }
 
     public function insert(...$data)
@@ -382,7 +383,7 @@ class SQL
             'values',
             implode(',', $segments)
         );
-        return DB::insert($this->sql, $bindings);
+        return DB::insert($this->sql, ...$bindings);
     }
 
     public function delete()
@@ -396,7 +397,7 @@ class SQL
                 $this->from,
                 $this->where,
             );
-            $bindings = $this->getBindingsAndParseSql($this->bindings['where'], $this->sql);
+            $bindings = $this->bindings['where'];
         } else {
             if ($this->where === '') {
                 return 0;
@@ -408,8 +409,8 @@ class SQL
                 $this->order_by,
                 $this->limit
             );
-            $bindings = $this->getBindingsAndParseSql(array_merge($this->bindings['where'], $this->bindings['limit']), $this->sql);
+            $bindings = array_merge($this->bindings['where'], $this->bindings['limit']);
         }
-        return DB::getInstance()->execute($this->sql, $bindings)->rowCount();
+        return DB::delete($this->sql, ...$bindings);
     }
 }

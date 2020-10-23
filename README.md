@@ -1,8 +1,6 @@
 # kicoephp
 
-kicoephp 是一个非常简单轻巧 (仅有9个核心类) 的 PHP web 框架.
-
-初衷是用于开发个人博客, 后来因为想写一套快速的路由前缀树实现而顺便将其重写, 现在虽然 route 的实现是写好了, 但需真正发挥其效力要做的的整合 swoole 却没做... 才不是半成品，这叫高度可定制化啦
+一个非常简单小巧 (仅由9个核心类组成) 的 PHP web 框架.
 
 ## Install
 
@@ -30,49 +28,51 @@ $link->start();
 
 ## Route
 
-ArticleController.php
+新版本框架源于自己一次写的快速路由前缀树实现，要是配合 swoole 速度应该很快！
+
 ```php
-<?php
-namespace app\controller;
-
-use kicoe\core\Response;
-use kicoe\core\Cache;
-
-class ArticleController
-{
-    /**
-     * @route get /
-     * @route get /article/page/{page}
-     * @param Response $response
-     * @param int $page
-     * @return Response
-     */
-    public function list(Response $response, int $page = 1)
-    {
-        return $response->json(['page' => $page]);
-    }
-
-    /**
-     * @route get /art/{art_id}/comments
-     * @param Cache $cache
-     * @param int $art_id
-     * @return array
-     */
-    public function comments(Cache $cache, int $art_id)
-    {
-        return $cache->getArr('art:'.$art_id) ?? [];
-    }
-
-    public function listByTag(int $tag_id, int $page = 1)
-    {
-        return [
-            'tag_id' => $tag_id, 
-            'page' => $page
-        ];
-    }
-}
+Route::get('/art/{id}', 'Article@detail');
+Route::get('/art/{id}/comments', 'Comment@list');
+Route::get('/art/list', 'Article@list');
 ```
-index.php
+
+上面的 route 定义将被解析成以下结构:
+
+```php
+[
+    'GET' => [
+        'path' => '/',
+        'handler' => [],
+        'children' => [
+            'a' => [
+                'path' => 'art/',
+                'handler' => [],
+                'children' => [
+                    '$' => [
+                        'path' => 'id',
+                        'handler' => ['Article', 'detail'],
+                        'children' => [
+                            'c' => [
+                                'path' => 'comments',
+                                'handler' => ['Comment', 'list'],
+                                'children' => []
+                            ]
+                        ],
+                    ],
+                    'l' => [
+                        'path' => 'list',
+                        'handler' => ['Article', 'list'],
+                        'children' => [],
+                    ]
+                ]
+            ]
+        ]
+    ]
+];
+```
+
+### Routing
+
 ```php
 <?php
 use kicoe\core\Link;
@@ -81,14 +81,15 @@ use kicoe\core\Route;
 use app\controller\ArticleController;
 
 $link = new Link();
-// 自动解析类方法注释中的 @route
+
+// 自动解析类方法注释 eg: @route get /index/{id}
 Route::parseAnnotation(ArticleController::class);
 
 // 一般 routing
 $link->route('/article/tag/{tag_id}/page/{page}/', [ArticleController::class, 'listByTag']);
 
-// 闭包(闭包推荐用来测试，暂不支持缓存)
-$link->route('/commen/up/{art_id}', function (Request $request, int $art_id) {
+// 闭包(推荐用来测试，暂不支持缓存)
+$link->route('/comment/up/{art_id}', function (Request $request, int $art_id) {
     $request->input('email');
     ...
 }, 'post');
@@ -96,31 +97,166 @@ $link->route('/commen/up/{art_id}', function (Request $request, int $art_id) {
 $link->start();
 ```
 
-控制器中的 `Response` `Cache` 都是框架自动注入的，如果想自定义类：
+### Injection
+
+在定义控制器方法参数时候，系统对象 `Request` `Reponse` `Config` 将会自动注入，也可以自定义 Request 类，框架会帮你实现
 
 ```php
-// 控制器方法对应类型的参数将自动注入该实例 index(self\Cache $cache, ...)
-$link->bind(self/Cache::class, new self\Cache);
+<?php
+$link = new Link();
+
+class SafeRequest extends \kicoe\core\Request
+{
+    public string $csrf_token = '';
+
+    public function __construct() {
+        $this->csrf_token = "headers['x-csrf-token']";
+        parent::__construct();
+    }
+}
+
+$link->bind(\kicoe\core\Request::class, SafeRequest::class);
+
+$link->route('/', function (SafeRequest $request) {
+    return $request->csrf_token;
+});
+
+$link->start();
 ```
-> 注意，response 和 request 不能绑定到 $link (也就是app), 因为这两个是和路由执行相关的
-> 方便未来转换 swoole 请求
 
-除了注入Class类型的参数，基础类型的参数也能自定义绑定
+自定义基础类型处理
 
 ```php
-// index(array $v, ...) 将会自动解析实际路由传过来的 $v 参数 'a,b,c' 为 ['a', 'b', 'c']
+<?php
+$link = new Link();
+
 $link->bind('array', function (string $value):array {
     return explode(',', $value);
 });
 
-// 可以大胆点定义~:
 $link->bind('bool', function (string $value):bool {
     if ($value === 'false') {
         return false;
     } else if ($value === 'true') {
         return true;
-    ...
+    }
+    return false; // ??
 });
+
+// 访问 /1,2,3/true 将返回　['ids' => ['1', '2', '3'], 'is_update' => true]
+$link->route('/{ids}/{is_update}', function (array $ids, bool $is_update) {
+    return [
+        'ids' => $ids,
+        'is_update' => $is_update
+    ];
+});
+
+$link->start();
+```
+
+## DB
+
+使用 `DB` 必须在先 config 中配置 `mysql`
+
+```php
+$link = new Link([
+    'mysql' => [
+        'db' => 'test',
+        'host' => 'mysql',
+        'port' => 3306,
+        'user' => 'root',
+        'passwd' => '123456',
+        'charset' => 'utf8mb4',
+    ]
+]);
+
+// 可以直接执行 sql
+DB::select('select id from article where id in (?) and status = ?', [1, 2, 3], 2)
+DB::insert('insert into article(title) values (?),(?)', 'f', 'l');
+...
+```
+
+`\kicoe\core\DB::table('xx')` 返回的是一个 `Modle` 对象，该对象可以通过静态/非静态的方式调用下列方法，并返回自身对象或查询结果。
+
+```php
+/**
+ * Class Model
+ * @package kicoe\core
+ * @method array select(...$columns)
+ * @method self where(string $segment, ...$params)
+ * @method self orWhere(string $segment, ...$params)
+ * @method self orderBy(...$params)
+ * @method self limit(...$params)
+ * @method self join(...$params)
+ * @method self leftJoin(...$params)
+ * @method self rightJoin(...$params)
+ * @method self having(...$params)
+ * @method self columns(...$params)
+ * @method self addColumns(...$params)
+ * @method self removeColumns(...$params)
+ * @method self from(string $table)
+ * @method array get()
+ * @method self first()
+ * @method self groupBy(string $segment)
+ * @method int save()
+ * @method int count()
+ * @method int delete()
+ * @method int update(array $data)
+ * @method static int insert(...$data)
+ * @method static self fetchById($id)
+ */
+class Model
+```
+
+### Select
+
+```php
+DB::table('tag')->where('id in (?)', [1, 2])->selete('id', 'name');
+```
+
+```php
+DB::table('tag')->where('color', 'aqua')
+    ->where('deleted_at is null')
+    ->orderBy('id', 'desc')
+    ->limit(0, 10)
+    ->get();
+```
+
+查询结果都为单个 `Model` 对象或 `Model` 对象的数组。
+
+### Insert
+
+```php
+DB::table('tag')->insert(['name' => 'php', ...], ['name' => 'golang', ...]);
+```
+
+### Update
+
+```php
+DB::table('tag')->where('id', 12)->update(['name' => 'php', ...]);
+```
+
+### Delete
+
+```php
+DB::table('tag')->where('id', 12)->delete();
+```
+
+### Transaction
+
+```php
+$title = '123';
+$tag_id = 10;
+DB::transaction(function () use ($title, $tag_id) {
+    $article = new Article();
+    $article->title = $title;
+    $article->save();
+    DB::table('article_tag')->insert([
+        'art_id' => $article->id,
+        'tag_id' => $tag_id,
+    ]);
+    // throw new Exception...
+})
 ```
 
 ## Model
@@ -134,6 +270,9 @@ use kicoe\core\Model;
 
 class Article extends Model
 {
+    // 默认类名小写
+    protected string $_table = 'article';
+
     public int $id;
     public string $title;
     public int $status;
@@ -152,96 +291,63 @@ class Article extends Model
 }
 ```
 
-继承 `Model` 类就可以作为模型使用, 其中所有为 public 的属性将作为查询的字段, 如果不想查询某个字段，只需要:
-
-```php
-    ...
-    public function getList()
-    {
-        return $this->removeColumns('content')->get();
-    }
-```
-
-Model 所有的查询与构造查询相关的方法都可以静态调用，返回自身对象或查询结果
+继承了 `Model` 的类用法和以上　`DB::table('_table_name')` 一样，并且会自动将其中定义所有的 public 属性作为查询字段。
 
 ```php
 use app\model\Article;
-...
 
-// Article object
+// Article 对象
 $art = Article::fetchById(1);
 
+$art = new Article();
 $art->title = 'new blog';
 // int rowCount
 $art->save();
+// int
+echo $art->id();
 
-// [Article object, ...]
 $arts = Article::where('status', self::STATUS_PUBLISH)
     ->where('deleted_at is null')
     ->where('id in (?)', [1, 2, 3])
     ->orderBy('created_time', 'desc')
-    ->limit(0, 10)
-    ->get();
-// int
+    ->limit(0, 10);
+
+// int count 查询构造的 sql 不会包括 limit
 $count = $arts->count();
+// array [Article, Article]
 
-// int rowCount
-Article::update(['title' => 'xx', 'content' => 'xxx']);
-
-// int rowCount
-Article::insert(['title' =>  'xx'], ['title' => 'xx']);
-
-$art1 = new Article();
-$art1->title = 'xx';
-$art2 = new \kicoe\core\Model();
-$art2->title = 'xx';
-// int rowCount
-Article::insert($art1, $art2);
-
-// Model obj 将返回一个原生 Model 对象，除了字段用法还是一样的
-\kicoe\core\DB::table('article');
-
-// [Model object, ...]
-\kicoe\core\DB::select('select * from article where id in (?)', [1, 2, 3]);
+$article_list = $arts->get();
 ```
 
-可用的函数列表如下：
+增删改等操作也等同于 `DB::table('table_name')`，但要注意对象的 `save()` 
 
 ```php
-/**
- * Class Model
- * @package kicoe\core
- *
- * @method self where(string $segment, ...$params)
- * @method self orWhere(string $segment, ...$params)
- * @method self orderBy(...$params)
- * @method self limit(...$params)
- * @method self join(...$params)
- * @method self leftJoin(...$params)
- * @method self rightJoin(...$params)
- * @method self having(...$params)
- * @method self columns(...$params)
- * @method self addColumns(...$params)
- * @method self removeColumns(...$params)
- * @method self from(string $table)
- * @method array get(...$params)
- * @method self first()
- * @method self groupBy(string $segment)
- * @method int save()
- * @method int count()
- * @method int delete()
- * @method static int update(array $data)
- * @method static int insert(...$data)
- * @method static self fetchById($id)
- */
+$articles = Article::get();
+foreach ($articles as $article) {
+    $article->title = '12';
+    $article->save();
+}
 ```
 
-> 因为实现都很简单，具体用法可以看看 SQL 类源码
+以上代码执行 sql 过多是一个问题，更重要的是框架中用来判断 `Model` 是否更新的原字段信息存在一个不是用构造函数初始化的属性中(所谓延迟)，单纯的 `fetchAll()` 无法初始化这个属性，导致更新 sql 语句里会带上所有不为 uninitialized 的字段。
 
-## Response
+虽然可能是设计缺陷，最好还是转成以下更常规的更新方式:
 
-`Response.php`
+```php
+Article::update(['title' => '12']);
+```
 
-## Request
+当然不是数组的查询结果完全没问题:
 
-`Request.php`
+```php
+$article = Article::first();
+$article->title = '12';
+// update article set title = ? where id = ?  limit ? ["12", 2, 1]
+$article->save();
+// 再 save 一遍不会执行任何语句
+$article->save();
+```
+
+---
+
+更多用法可以参照 [blog](https://github.com/moonprism/blog/tree/master/read)
