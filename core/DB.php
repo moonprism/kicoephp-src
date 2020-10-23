@@ -109,7 +109,7 @@ class DB
     public static function insert(string $sql, ...$bindings)
     {
         $instance = self::getInstance();
-        $instance->execute($sql, ...$bindings);
+        $instance->execute($sql, $bindings);
         return $instance->pdoCase()->lastInsertId();
     }
 
