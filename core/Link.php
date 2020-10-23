@@ -16,7 +16,7 @@ class Link
 
         if ($redis_conf = $config->get('redis')) {
             /** @var Cache $cache */
-            $cache = self::makeWithArgs(Cache::class, $conf);
+            $cache = self::makeWithArgs(Cache::class, $redis_conf);
             if ($config->get('cache')) {
                 if ($route_tree = $cache->getArr('s:route')) {
                     Route::setCache($route_tree);
