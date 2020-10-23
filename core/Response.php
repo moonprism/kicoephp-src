@@ -4,67 +4,81 @@ namespace kicoe\core;
 
 class Response
 {
-    protected static $_instance;
+    protected array $header = [];
+    protected string $body = '';
 
-    private function __construct(){}
-
-    /**
-     * 获取单例
-     * @return Response
-     */
-    public static function getInstance()
+    public function header(string $key, string $value)
     {
-        if (!isset(self::$_instance)) {
-            self::$_instance = new self();
+        $this->header[] = $key . ': ' . $value;
+        return $this;
+    }
+
+    public function status(int $code)
+    {
+        $this->header[] = 'HTTP/1.1 ' . $code;
+        return $this;
+    }
+
+    public function json($data)
+    {
+        $this->header('Content-type', 'text/json');
+        $this->body = json_encode($data);
+        return $this;
+    }
+
+    public function text($str)
+    {
+        $this->body = (string)$str;
+        return $this;
+    }
+
+    public function send()
+    {
+        foreach ($this->header as $h) {
+            \header($h);
         }
-        return self::$_instance;
+        if ($this->view_file !== '') {
+            $view_file = $this->view_path.$this->view_file.'.php';
+            if (!file_exists($view_file)) {
+                throw new \Exception(sprintf('view file "%s" not exists', $view_file));
+            }
+            extract($this->view_vars, EXTR_SKIP);
+            include $view_file;
+            return;
+        }
+        echo $this->body;
     }
 
-    /**
-     * 设置头信息
-     * @param string $key
-     * @param string $value 键值对
-     * @return $this
-     */
-    public function header($key, $value)
-    {
-        \header($key.': '.$value);
-        return $this;
-    }
-
-    /**
-     * 设置响应状态码
-     * @param int $code 状态码
-     * @return $this
-     */
-    public function status($code)
-    {
-        \header('HTTP/1.1 '.$code);
-        return $this;
-    }
-
-    /**
-     * @param $data
-     * @return $this
-     */
-    public function json(&$data)
-    {
-        $this->header('Content-type', 'text/json')->send(json_encode($data));
-        return $this;
-    }
-
-    /**
-     * 所有的输出都将代理到这
-     * @param string 显示内容
-     */
-    public function send($str)
-    {
-        echo $str;
-    }
-
-    public function redirect($url)
+    public function redirect(string $url)
     {
         $this->header('Location', $url);
     }
 
+    // 把 View 类提到这
+
+    protected string $view_path = '';
+
+    protected string $view_file = '';
+
+    protected array $view_vars = [];
+
+    public function __construct(string $view_path = '')
+    {
+        $this->view_path = $view_path;
+    }
+
+    public function view(string $path, array $vars = [])
+    {
+        $this->view_file = $path;
+        if ($vars !== []) {
+            $this->view_vars = $vars;
+        }
+        return $this;
+    }
+
+    public function with(array $vars = [])
+    {
+        $this->view_vars = $vars;
+        return $this;
+    }
 }

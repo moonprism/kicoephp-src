@@ -1,38 +1,39 @@
 <?php
-// 加载配置类
 
 namespace kicoe\core;
 
 class Config
 {
+    protected array $config = [];
 
-    private static $config = [];
-
-    /**
-     * 加载配置文件初始化
-     * @param $path string 配置文件路径
-     * @throws
-     */
-    public static function load($path)
+    public function __construct(array $conf)
     {
-        if (is_file($path)) {
-            self::$config = include $path;
-        } else {
-            throw new Exception('no such directory：', $path);
-        }
+        $this->config = $conf;
     }
 
-    /**
-     * 解析配置文件
-     * @param string $type 配置项
-     * @return array 配置信息
-     * @throws
-     */
-    public static function prpr($type)
+    public function get(string $key = '')
     {
-        if (isset(self::$config[$type])) {
-            return self::$config[$type]; 
+        if ($key === '') {
+            return $this->config;
         }
-        throw new Exception("config item not set：", $type);
+        $c = $this->config;
+        foreach (explode('.', $key) as $k) {
+            if ( !($c = $c[$k] ?? false) ) {
+                break;
+            }
+        }
+        return $c;
+    }
+
+    public function set(string $key, $value)
+    {
+        $c = &$this->config;
+        foreach (explode('.', $key) as $k) {
+            if (!isset($c[$k])) {
+                $c[$k] = [];
+            }
+            $c = &$c[$k];
+        }
+        $c = $value;
     }
 }
