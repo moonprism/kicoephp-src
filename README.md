@@ -10,6 +10,12 @@ composer require kicoephp/src
 
 ## Dash
 
+nginx 配置:
+```
+location / {
+    try_files $uri $uri/ /index.php?$query_string;
+}
+```
 ```php
 <?php
 
@@ -28,7 +34,7 @@ $link->start();
 
 ## Route
 
-新版本框架源于自己一次写的快速路由前缀树实现，要是配合 swoole 速度应该很快！
+新版本框架源于自己一次写的快速路由前缀树实现, 总之就是非常快！(要是能配合 swoole 的话...)
 
 ```php
 Route::get('/art/{id}', 'Article@detail');
@@ -99,7 +105,7 @@ $link->start();
 
 ### Injection
 
-在定义控制器方法参数时候，系统对象 `Request` `Reponse` `Config` 将会自动注入，也可以自定义 Request 类，框架会帮你实现
+在定义控制器方法参数时候，系统对象 `Request` `Reponse` `Config` 将会自动注入，也可以自定义 Request 类注入:
 
 ```php
 <?php
@@ -124,7 +130,7 @@ $link->route('/', function (SafeRequest $request) {
 $link->start();
 ```
 
-自定义基础类型处理
+自定义基础类型:
 
 ```php
 <?php
