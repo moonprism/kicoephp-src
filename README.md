@@ -105,7 +105,7 @@ $link->start();
 
 ### Injection
 
-在定义控制器方法参数时候，系统对象 `Request` `Reponse` `Config` 将会自动注入，也可以自定义 Request 类注入:
+在定义控制器方法参数时候，系统对象 `Request` `Reponse` `Config` 将会自动注入，也可以自定义注入的 Request 类:
 
 ```php
 <?php
@@ -159,6 +159,8 @@ $link->route('/{ids}/{is_update}', function (array $ids, bool $is_update) {
 
 $link->start();
 ```
+
+当然make也可以绑定到具体的对象
 
 ## DB
 
@@ -261,7 +263,7 @@ DB::transaction(function () use ($title, $tag_id) {
         'art_id' => $article->id,
         'tag_id' => $tag_id,
     ]);
-    // throw new Exception...
+    // throw any Exception tigger DB::rollBack()
 })
 ```
 
@@ -310,18 +312,18 @@ $art->title = 'new blog';
 // int rowCount
 $art->save();
 // int
-echo $art->id();
+echo $art->id;
 
-$arts = Article::where('status', self::STATUS_PUBLISH)
+$arts = Article::where('status', Article::STATUS_PUBLISH)
     ->where('deleted_at is null')
     ->where('id in (?)', [1, 2, 3])
     ->orderBy('created_time', 'desc')
     ->limit(0, 10);
 
-// int count 查询构造的 sql 不会包括 limit
+// int count where 条件下的总数
 $count = $arts->count();
-// array [Article, Article]
 
+// array [Article, Article]
 $article_list = $arts->get();
 ```
 

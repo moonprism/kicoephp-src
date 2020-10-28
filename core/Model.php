@@ -39,7 +39,10 @@ class Model
 
     public function __construct(string $table = '')
     {
-        $this->_table = $table ?: self::defaultTableName();
+        if ($table === '') {
+            $table = $this->_table ?: self::defaultTableName();
+        }
+        $this->_table = $table;
     }
 
     public function getPrimaryKey()
@@ -54,7 +57,7 @@ class Model
 
     public static function __callStatic(string $name, $args)
     {
-        return call_user_func_array([new static(static::defaultTableName()), $name], $args);
+        return call_user_func_array([new static(), $name], $args);
     }
 
     public function __call(string $name, $args)

@@ -25,7 +25,6 @@ class DB
         'port' => 3306,
         'user' => 'root',
         'passwd' => '',
-        'charset' => 'utf8mb4',
     ];
 
     public function __construct(array $conf)
@@ -36,12 +35,20 @@ class DB
     protected function pdoCase():PDO
     {
         if ($this->pdo === null) {
-            $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s',
+            $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s',
                 $this->mysql_conf['host'],
                 $this->mysql_conf['port'],
                 $this->mysql_conf['db'],
-                $this->mysql_conf['charset']
             );
+            if ($charset = $this->mysql_conf['charset'] ?? false) {
+                $dsn .= ";charset=$charset";
+            }
+//            $options = null;
+//            if ($collation = $this->mysql_conf['collate'] ?? false) {
+//                $options = [
+//                    PDO::MYSQL_ATTR_INIT_COMMAND => "set names '".$this->mysql_conf['charset']."' collate '".$collation."'",
+//                ];
+//            }
             $this->pdo = new PDO($dsn, $this->mysql_conf['user'], $this->mysql_conf['passwd']);
         }
         return $this->pdo;

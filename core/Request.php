@@ -15,7 +15,7 @@ class Request
     {
         // query
         $url_data = parse_url($_SERVER['REQUEST_URI']);
-        if ($query_str = $url_data['query'] ?? '') {
+        if ($query_str = $url_data['query'] ?? false) {
             parse_str(urldecode($query_str), $this->query);
             $this->input = $this->query;
         }
