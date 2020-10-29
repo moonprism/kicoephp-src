@@ -8,6 +8,7 @@ class Request
     protected array $input = [];
 
     protected string $path = '';
+    protected string $url = '';
 
     protected array $route_params = [];
 
@@ -29,6 +30,9 @@ class Request
         } else if ($this->method() === 'POST') {
             $this->input = array_merge($this->input, $_POST);
         }
+
+        // url
+        $this->url = $_SERVER['HTTP_HOST'].$this->path.($query_str ? '?'.$query_str : '');
     }
 
     public function isJson():bool
@@ -47,6 +51,11 @@ class Request
             return $this->route_params[$var_name] ?? $default;
         }
         return $this->path;
+    }
+
+    public function url()
+    {
+        return $this->url;
     }
 
     public function setRouteParams(array $param_map)

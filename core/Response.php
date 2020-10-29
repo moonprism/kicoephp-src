@@ -52,6 +52,7 @@ class Response
     public function redirect(string $url)
     {
         $this->header('Location', $url);
+        return $this;
     }
 
     // 把 View 类提到这
