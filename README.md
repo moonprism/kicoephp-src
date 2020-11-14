@@ -1,6 +1,6 @@
 # kicoephp
 
-一个非常简单小巧 (仅由9个核心类组成) 的 PHP web 框架.
+一个非常简单小巧 (仅由9个核心类组成) 的 php7.4 web 框架.
 
 ## Install
 
@@ -77,6 +77,11 @@ Route::get('/art/list', 'Article@list');
 ];
 ```
 
+和一般的路由前缀树相比优点:
+
+1. 纯数组实现占用空间小
+2. 每个字典元素开头字符作为key，hash一次便能知道下一节点走向
+
 ### Routing
 
 ```php
@@ -94,43 +99,18 @@ Route::parseAnnotation(ArticleController::class);
 // 一般 routing
 $link->route('/article/tag/{tag_id}/page/{page}/', [ArticleController::class, 'listByTag']);
 
-// 闭包(推荐用来测试，暂不支持缓存)
+// 闭包
 $link->route('/comment/up/{art_id}', function (Request $request, int $art_id) {
-    $request->input('email');
+    $email = $request->input('email');
     ...
 }, 'post');
 
 $link->start();
 ```
 
-### Injection
+#### 自定义基础类型
 
-在定义控制器方法参数时候，系统对象 `Request` `Reponse` `Config` 将会自动注入，也可以自定义注入的 Request 类:
-
-```php
-<?php
-$link = new Link();
-
-class SafeRequest extends \kicoe\core\Request
-{
-    public string $csrf_token = '';
-
-    public function __construct() {
-        $this->csrf_token = "headers['x-csrf-token']";
-        parent::__construct();
-    }
-}
-
-$link->bind(\kicoe\core\Request::class, SafeRequest::class);
-
-$link->route('/', function (SafeRequest $request) {
-    return $request->csrf_token;
-});
-
-$link->start();
-```
-
-自定义基础类型:
+在路由参数映射到控制器方法参数时，将会自动将 string 转换成定义的类型，同时允许自定义:
 
 ```php
 <?php
@@ -160,11 +140,148 @@ $link->route('/{ids}/{is_update}', function (array $ids, bool $is_update) {
 $link->start();
 ```
 
-当然make也可以绑定到具体的对象
+## Request
+
+在定义控制器方法参数类型为 Request 时，系统将会自动构造实例注入
+
+```php
+<?php
+$link = new \kicoe\core\Link();
+
+$link->route('/tag/{tag_id}', function (\kicoe\core\Request $request) {
+    $request->input('name');
+    ...
+}, 'put');
+
+$link->start();
+```
+
+## Response
+
+同上，系统也将自动构造注入 Response 类:
+
+```php
+<?php
+$link = new \kicoe\core\Link();
+
+$link->route('/tag/{tag_id}', function (\kicoe\core\Response $response, int $tag_id) {
+    if (!$tag = search($tag_id)) {
+        return $response->status(404);
+    }
+    ...
+    return $response->json($tag);
+}, 'get');
+
+$link->start();
+```
+
+#### 自定义请求与返回类
+
+继承系统 Request 和 Response 类中定义的所有公共属性将自动解析成相应实现
+
+> 类似于 java 开发中的 `DTO` 与 `VO`
+
+自定义渲染层:
+
+```php
+class ViewResponse extends \kicoe\core\Response
+{
+    protected string $view_path;
+    protected string $view_file;
+    protected array $view_vars = [];
+
+    public function __construct()
+    {
+        $config = \kicoe\core\Link::make(\kicoe\core\Config::class);
+        $this->view_path = $config->get('space.view');
+    }
+
+    public function send()
+    {
+        // 可以引用各种语法解析库
+        $view_file = $this->view_path.$this->view_file.'.php';
+        if (!file_exists($view_file)) {
+            throw new \Exception(sprintf('view file "%s" not exists', $view_file));
+        }
+        extract((array)$this, EXTR_SKIP);
+        extract($this->view_vars, EXTR_SKIP);
+
+        $this->_body = include $view_file;
+        parent::send();
+    }
+
+    public function view(string $path, array $vars = [])
+    {
+        $this->view_file = $path;
+        if ($vars !== []) {
+            $this->view_vars = $vars;
+        }
+        return $this;
+    }
+}
+```
+
+以下是一段示例:
+
+```php
+<?php
+$link = new \kicoe\core\Link();
+
+class CommentRequest extends \kicoe\core\Request
+{
+    public int $art_id;
+    public int $to_id = 0;
+    public string $name;
+    public string $email;
+    public string $link = '';
+    public string $content;
+
+    /**
+     * @return string error 错误信息
+     */
+    public function filter():string
+    {
+        $this->name = htmlspecialchars($this->name);
+        $this->email = htmlspecialchars($this->email);
+        $this->link = htmlspecialchars($this->link);
+        $this->content = htmlspecialchars($this->content);
+        if (!preg_match('/^([A-Za-z0-9_\-\.])+\@([A-Za-z0-9_\-\.])+\.([A-Za-z]{2,4})$/', $this->email)) {
+            return 'email 格式错误';
+        }
+        return '';
+    }
+}
+
+class ApiResponse extends \kicoe\core\Response
+{
+    public int $code = 200;
+    public string $message = '';
+    /** @var CommentItem[] */
+    public array $data = [];
+
+    public function setBodyStatus(int $code, string $message):self
+    {
+        $this->code = $code;
+        $this->message = $message;
+        return $this;
+    }
+}
+
+$link->route('/{art_id}', function (CommentRequest $request, ApiResponse $response, int $art_id) {
+    if ($err = $request->filter()) {
+        return $response->setBodyStatus(422, 'ValidationError: '.$err);
+    }
+    Comment::insert($request);
+    $response->data = Comment::where('art_id', $art_id)->get();
+    return $response;
+}, 'post');
+
+$link->start();
+```
 
 ## DB
 
-使用 `DB` 必须在先 config 中配置 `mysql`
+使用 `DB` 前必须在 config 中配置 `mysql`
 
 ```php
 $link = new Link([
@@ -179,12 +296,12 @@ $link = new Link([
 ]);
 
 // 可以直接执行 sql
-DB::select('select id from article where id in (?) and status = ?', [1, 2, 3], 2)
+DB::select('select id from article where id in (?) and status = ?', [1, 2, 3], 2);
 DB::insert('insert into article(title) values (?),(?)', 'f', 'l');
 ...
 ```
 
-`\kicoe\core\DB::table('xx')` 返回的是一个 `Modle` 对象，该对象可以通过静态/非静态的方式调用下列方法，并返回自身对象或查询结果。
+`\kicoe\core\DB::table('xx')` 返回的是一个 `Model` 对象，该对象可以通过静态/非静态的方式调用下列方法，并返回自身对象或查询结果。
 
 ```php
 /**
@@ -264,7 +381,7 @@ DB::transaction(function () use ($title, $tag_id) {
         'tag_id' => $tag_id,
     ]);
     // throw any Exception tigger DB::rollBack()
-})
+});
 ```
 
 ## Model

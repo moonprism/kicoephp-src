@@ -248,16 +248,11 @@ class SQL
 
     protected ?Model $obj = null;
 
-    public function setClass(string $class)
-    {
-        $this->class = $class;
-        $class_vars = get_class_vars($this->class);
-        $this->columns = array_keys($class_vars);
-    }
-
     public function setObj(Model $obj)
     {
         $this->obj = $obj;
+        $this->class = get_class($obj);
+        $this->columns = array_keys(get_class_vars($this->class));
     }
 
     public function select(...$columns)
@@ -282,7 +277,6 @@ class SQL
             $this->group_by,
             $this->having,
         );
-        // 不可重用
         $bindings = $this->bindings(array_diff_key($this->bindings, ['limit'=>'']));
         return DB::getInstance()->execute($sql, $this->getBindingsAndParseSql($bindings))->fetchColumn();
     }

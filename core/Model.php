@@ -26,7 +26,7 @@ namespace kicoe\core;
  * @method int delete()
  * @method int update(array $data)
  * @method static int insert(...$data)
- * @method static self fetchById($id)
+ * @method static static fetchById($id)
  */
 class Model
 {
@@ -73,9 +73,8 @@ class Model
     {
         if ($this->sql === null) {
             $this->sql = new SQL();
-            $this->sql->from($this->_table);
-            $this->sql->setClass(static::class);
             $this->sql->setObj($this);
+            $this->sql->from($this->_table);
         }
         return $this->sql;
     }

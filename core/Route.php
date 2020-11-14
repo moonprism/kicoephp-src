@@ -43,47 +43,12 @@ class Route
         'DELETE' => [],
     ];
 
-    // simple cache flag
-    protected static bool $cache = false;
-
-    public static function setCache(array $tree)
-    {
-        self::$tree = $tree;
-        self::$cache = true;
-    }
-
-    public static function getCache():array
-    {
-        return self::$tree;
-    }
-
-    // simple service container
-    protected array $bindings = [];
-
-    public function __construct(array $bindings = [])
-    {
-        $this->bindings = $bindings;
-    }
-
-    public function scBind($name, $instance)
-    {
-        $this->bindings[$name] = $instance;
-    }
-
-    public function scMake($name)
-    {
-        return $this->bindings[$name] ?? null;
-    }
-
     /**
      * 从类方法注解中解析路由
      * @param $class_name
      */
     public static function parseAnnotation($class_name)
     {
-        if (self::$cache) {
-            return;
-        }
         try {
             $class = new ReflectionClass($class_name);
         } catch (ReflectionException $e) {
@@ -284,13 +249,6 @@ class Route
      */
     public static function add(string $type, string $path, $call)
     {
-        if (self::$cache) {
-            // if ($call instanceof \Closure) {
-            //    throw new \
-            // }
-            return;
-        }
-        // 暂不支持缓存闭包
         if (is_array($call)) {
             list($class_name, $method_name) = $call;
         } else if (is_string($call)) {
@@ -321,7 +279,7 @@ class Route
         $str = trim($path, '/');
         $params = [];
         //$stack = [];
-        if ($res === []) return [];
+        if ($res === []) return [null, null];
         while ($res['children'] !== [] && $str !== '') {
             $start_char = $str[0];
             if ($node = $res['children'][$start_char] ?? false) {
@@ -363,53 +321,8 @@ class Route
         }
         $handler = $res['handler'];
         if ($handler !== [] && $str === '') {
-            return compact('handler', 'params');
+            return [$handler, $params];
         }
-        return [];
-    }
-
-    /**
-     * @param $handler [class, method] or Closure
-     * @param $param_map
-     * @return array [handler, real_args, args_map]
-     * @throws ReflectionException
-     */
-    public function prepare($handler, array $param_map):array
-    {
-        if (is_array($handler)) {
-            // [controller, method]
-            $ref_class = new ReflectionClass($handler[0]);
-            $ref_method = $ref_class->getMethod($handler[1]);
-            $handler = [new $handler[0], $handler[1]];
-            $ref_parameters = $ref_method->getParameters();
-        } else {
-            // Closure
-            $ref_function = new ReflectionFunction($handler);
-            $ref_parameters = $ref_function->getParameters();
-        }
-        $param_arr = [];
-        foreach ($ref_parameters as $parameter) {
-            // 自动注入
-            $name = $parameter->getName();
-            $type = $parameter->getType();
-            if ($type instanceof \ReflectionNamedType) {
-                // 指定类型的变量
-                $type_name = $type->getName();
-                if ($instance = $this->scMake($type_name)) {
-                    if ($instance instanceof \Closure) {
-                        if (isset($param_map[$name])) {
-                            $param_arr[] = call_user_func($instance, $param_map[$name]);
-                        }
-                        continue;
-                    }
-                    $param_arr[] = $instance;
-                    continue;
-                }
-            }
-            if (isset($param_map[$name])) {
-                $param_arr[] = $param_map[$name];
-            }
-        }
-        return [$handler, $param_arr, $param_map];
+        return [null, null];
     }
 }

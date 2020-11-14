@@ -2,84 +2,62 @@
 
 namespace kicoe\core;
 
+use ReflectionClass;
+
 class Response
 {
-    protected array $header = [];
-    protected string $body = '';
+    protected array $_header = [];
+    protected string $_body = '';
 
     public function header(string $key, string $value)
     {
-        $this->header[] = $key . ': ' . $value;
+        $this->_header[] = $key . ': ' . $value;
         return $this;
     }
 
     public function status(int $code)
     {
-        $this->header[] = 'HTTP/1.1 ' . $code;
+        $this->_header[] = 'HTTP/1.1 ' . $code;
         return $this;
     }
 
     public function json($data)
     {
-        $this->header('Content-type', 'text/json');
-        $this->body = json_encode($data);
+        $this->jsonHeader();
+        $this->_body = json_encode($data);
         return $this;
+    }
+
+    protected function jsonHeader()
+    {
+        $this->header('Content-type', 'text/json');
     }
 
     public function text($str)
     {
-        $this->body = (string)$str;
+        $this->_body = (string)$str;
         return $this;
     }
 
     public function send()
     {
-        foreach ($this->header as $h) {
+        foreach ($this->_header as $h) {
             \header($h);
         }
-        if ($this->view_file !== '') {
-            $view_file = $this->view_path.$this->view_file.'.php';
-            if (!file_exists($view_file)) {
-                throw new \Exception(sprintf('view file "%s" not exists', $view_file));
+        if ($this->_body === '') {
+            $ref_class = new ReflectionClass($this);
+            $props = $ref_class->getProperties(\ReflectionProperty::IS_PUBLIC);
+            if (count($props) === 0) {
+                return;
             }
-            extract($this->view_vars, EXTR_SKIP);
-            include $view_file;
-            return;
+            $this->json($this);
         }
-        echo $this->body;
+        echo $this->_body;
     }
 
     public function redirect(string $url)
     {
         $this->header('Location', $url);
-        return $this;
-    }
-
-    // 把 View 类提到这
-
-    protected string $view_path = '';
-
-    protected string $view_file = '';
-
-    protected array $view_vars = [];
-
-    public function __construct(string $view_path = '')
-    {
-        $this->view_path = $view_path;
-    }
-
-    public function view(string $path, array $vars = [])
-    {
-        $this->view_file = $path;
-        if ($vars !== []) {
-            $this->view_vars = $vars;
-        }
-        return $this;
-    }
-
-    public function with(array $vars = [])
-    {
-        $this->view_vars = $vars;
         return $this;
     }
 }

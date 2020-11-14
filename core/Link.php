@@ -2,11 +2,12 @@
 
 namespace kicoe\core;
 
+use ReflectionClass;
+use ReflectionFunction;
+
 class Link
 {
     protected static array $bindings = [];
-
-    public bool $is_flush_route_cache = false;
 
     public function __construct($conf = [])
     {
@@ -14,18 +15,12 @@ class Link
         /** @var Config $config */
         $config = self::makeWithArgs(Config::class, $conf);
 
+        // 初始化 redis
         if ($redis_conf = $config->get('redis')) {
-            /** @var Cache $cache */
-            $cache = self::makeWithArgs(Cache::class, $redis_conf);
-            if ($config->get('cache')) {
-                if ($route_tree = $cache->getArr('s:route')) {
-                    Route::setCache($route_tree);
-                } else {
-                    $this->is_flush_route_cache = true;
-                }
-            }
+            self::makeWithArgs(Cache::class, $redis_conf);
         }
 
+        // 初始化 mysql
         if ($mysql_conf = $config->get('mysql')) {
             /** @var DB $db_instance */
             $db_instance = self::makeWithArgs(DB::class, $mysql_conf);
@@ -33,6 +28,9 @@ class Link
         }
 
         // 基础类型绑定
+        self::bind('string', function (string $value):string {
+            return $value;
+        });
         self::bind('int', function (string $value):int {
             return (int)$value;
         });
@@ -46,41 +44,60 @@ class Link
 
     public function start()
     {
-        // todo
-        $view_path = $this->make(Config::class)->get('space.view') ?? '';
-        // 构造专属　request response
-        $request = self::makeWithArgs(Request::class);
-        $response = self::makeWithArgs(Response::class, $view_path);
-        // merge bindings
-        $route = new Route(self::$bindings);
-        $route->scBind(Request::class, $request);
-        $route->scBind(Response::class, $response);
-        $this->run($route);
-    }
+        // todo 自定义 Request 和 Response 情况下解决多余生成
+        $request = new Request();
+        $response = new Response();
 
-    public function run(Route $route)
-    {
         // 路由执行
-        if ($this->is_flush_route_cache) {
-            /** @var Cache $cache */
-            $cache = $this->make(Cache::class);
-            $cache->setArr('s:route', Route::getCache());
-        }
-
-        $request = $route->scMake(Request::class);
-        $response = $route->scMake(Response::class);
-
-        $route_res = Route::search($request->path(), $request->method());
-        if ($route_res === []) {
+        list($handler, $params) = Route::search($request->path(), $request->method());
+        if (is_null($handler)) {
             $response->status(404);
             $response->send();
             return;
         }
 
-        list($handler, $real_param, $param_map) = $route->prepare($route_res['handler'], $route_res['params']);
-        $request->setRouteParams($param_map);
+        if (is_array($handler)) {
+            // [controller, method]
+            $ref_class = new ReflectionClass($handler[0]);
+            $ref_method = $ref_class->getMethod($handler[1]);
+            $handler = [new $handler[0], $handler[1]];
+            $ref_parameters = $ref_method->getParameters();
+        } else {
+            // Closure
+            $ref_function = new ReflectionFunction($handler);
+            $ref_parameters = $ref_function->getParameters();
+        }
+        $real_params = [];
+        foreach ($ref_parameters as $parameter) {
+            // 自动注入
+            $name = $parameter->getName();
+            $type = $parameter->getType();
+            if ($type instanceof \ReflectionNamedType) {
+                // 指定类型的变量
+                $type_name = $type->getName();
+                if ($instance = $this->make($type_name)) {
+                    if ($instance instanceof \Closure) {
+                        if (isset($params[$name])) {
+                            $real_params[] = call_user_func($instance, $params[$name]);
+                        }
+                        continue;
+                    }
+                } else if (class_exists($type_name)) {
+                    // todo
+                    $instance = new $type_name;
+                }
+                if ($instance instanceof Request) {
+                    $instance->init($params);
+                }
+                $real_params[] = $instance;
+                continue;
+            }
+            if (isset($params[$name])) {
+                $real_params[] = $params[$name];
+            }
+        }
 
-        $res = call_user_func_array($handler, $real_param);
+        $res = call_user_func_array($handler, $real_params);
 
         if ($res instanceof Response) {
             $response = $res;
