@@ -45,7 +45,7 @@ class Request
         $props = $ref_class->getProperties(\ReflectionProperty::IS_PUBLIC);
         foreach ($props as $prop) {
             $prop_name = $prop->getName();
-            if ($var = $params[$prop_name] ?? $this->input($prop_name)) {
+            if ($var = $this->input($prop_name) ?? $params[$prop_name]) {
                 $this->$prop_name = urldecode($var);
             } else if (!isset($this->$prop_name)) {
                 throw new \InvalidArgumentException(sprintf('%s property %s not exists', static::class, $prop_name));

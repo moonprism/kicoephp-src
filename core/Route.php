@@ -4,7 +4,6 @@ namespace kicoe\core;
 
 use ReflectionClass;
 use ReflectionException;
-use ReflectionFunction;
 
 class Route
 {
@@ -13,41 +12,36 @@ class Route
      * example:
      * @route get /index/{var1}
      * @route get /index/test
-     * 'GET' => [
+     * 'GET' => {
      *   'path' => '/'
      *   'handler' => [],
      *   'children' => [
-     *     'i' => [
+     *     'i' => {
      *       'path' => 'index/',
      *       'handler' => [],
      *       'children' => [
-     *         '$' => [
+     *         '$' => {
      *           'path' => 'var1',
      *           'handler' => ['controller', 'method'],
      *           'children' => [],
-     *         ],
-     *         't' => [
+     *         },
+     *         't' => {
      *           'path' => 'test',
      *           'handler' => ['controller2', 'method2'],
      *           'children' => [],
-     *         ]
+     *         }
      *       ]
-     *     ]
+     *     }
      *   ]
-     *   ...
+     * }
      */
-    protected static array $tree = [
-        'GET' => [],
-        'POST' => [],
-        'PUT' => [],
-        'DELETE' => [],
-    ];
+    public static array $tree = [];
 
     /**
      * 从类方法注解中解析路由
-     * @param $class_name
+     * @param string $class_name
      */
-    public static function parseAnnotation($class_name)
+    public static function parseAnnotation(string $class_name)
     {
         try {
             $class = new ReflectionClass($class_name);
@@ -57,7 +51,7 @@ class Route
 
         foreach ($class->getMethods() as $method) {
             if ($doc = $method->getDocComment()) {
-                // @route get /xx/xx
+                // @route get /path/{var_name}/...
                 preg_match_all('/@route (.+?) (.+?)\s/', $doc, $matches, PREG_SET_ORDER);
                 foreach ($matches as $mat) {
                     self::add($mat[1], $mat[2], [$class_name, $method->getName()]);
@@ -67,101 +61,94 @@ class Route
     }
 
     /**
-     * @param string $type GET or POST...
+     * @param string $type [GET, POST, PUT, DELETE]
      * @param string $path
      * @param $handler
      */
     protected static function addRoute(string $type, string $path, $handler)
     {
         $type = strtoupper($type);
-        $res = self::$tree[$type];
-        if ($res === []) {
-            $res = self::$tree[$type] = self::generateTreeNode('/', [], []);
+        if (!isset(self::$tree[$type])) {
+            self::$tree[$type] = self::newTreeNode('/');
         }
-        $str = trim($path, '/');
-        $stack = [$type];
-        // init
+        $node = self::$tree[$type];
+
         if ($path === '/') {
-            self::$tree[$type]['handler'] = $handler;
+            $node->handler = $handler;
             return;
         }
-        while ($res['children'] !== [] && $str !== '') {
-            $start_char = $str[0];
-            // 解析栈，路由出问题从这里开始排查
-            $stack[] = $start_char !== '{' ? $start_char : '$';
-            if ($node = $res['children'][$start_char] ?? false) {
-                $path_len = strlen($node['path']);
-                if (substr($str, 0, $path_len) === $node['path']) {
-                    $res = $node;
-                    $str = substr($str, $path_len);
+        $path = trim($path, '/');
+
+        // 路由格式转换 /{var_name} => /$var_name
+        $path = preg_replace('/{(.+?)}/', '\$${1}', $path);
+        $stack = [$type];
+
+        while ($node->children !== [] && $path !== '') {
+            $stack[] = $start_char = $path[0];
+            if (isset($node->children[$start_char])) {
+                $node = $node->children[$start_char];
+                if ($start_char === '$') {
+                    // 变量直接匹配
+                    $var_end_pos = strpos($path, '/');
+                    if ($var_end_pos === false) $var_end_pos = strlen($path);
+                    $node->path .= '/'.substr($path, 1, $var_end_pos-1);
+                    $path = substr($path, $var_end_pos ? $var_end_pos+1 : 0);
+                    continue;
+                }
+                $path_len = strlen($node->path);
+                if (substr($path, 0, $path_len) === $node->path) {
+                    $path = substr($path, $path_len);
                     continue;
                 } else {
                     // LCP
-                    $sl = strlen($str);
-                    $pl = strlen($node['path']);
-                    for ($l = 0; $l < min($sl, $pl) && $str[$l] === $node['path'][$l]; $l++){};
-                    $lcp_str = substr($str, 0, $l);
+                    $sl = strlen($path);
+                    $pl = strlen($node->path);
+                    for ($l = 0; $l < min($sl, $pl) && $path[$l] === $node->path[$l]; $l++){};
+                    $lcp_str = substr($path, 0, $l);
                     // 分裂构造node
-                    $str = substr($str, $l);
-                    $p_str = substr($node['path'], $l);
-                    $node['path'] = $p_str;
-                    $attach_node = self::generateTreeNode($lcp_str, [], [$p_str[0] => $node]);
+                    $path = substr($path, $l);
+                    $p_str = substr($node->path, $l);
+                    $node->path = $p_str;
+                    $attach_node = self::newTreeNode($lcp_str, [], [$p_str[0] => $node]);
                     if ($sl === $l) {
                         // 将分裂节点作为新node的最终目的
-                        $attach_node['handler'] = $handler;
+                        $attach_node->handler = $handler;
                     } else {
                         // 两开花
-                        $parse_node = self::parseTreeNode($str, $handler);
-                        $attach_node['children'][$parse_node[0]] = $parse_node[1];
+                        $parse_node = self::parseTreeNode($path, $handler);
+                        $attach_node->children[$parse_node[0]] = $parse_node[1];
                     }
-                    $str = '';
                     self::setTreeNodeByCallStack($attach_node, $stack);
+                    $path = '';
                     break;
                 }
             } else {
-                if ($node = $res['children']['$'] ?? false) {
-                    if ($start_char === '{') {
-                        // 变量直接匹配
-                        $var_end_pos = strpos($str, '}');
-                        if (!$var_end_pos) {
-                            throw new \InvalidArgumentException(sprintf('Route to "%s": variable definition not end', $path));
-                        }
-                        $res = $node;
-                        $str = substr($str, $var_end_pos+1);
-                        continue;
-                    }
-                }
                 // 生成一般节点直接附加
-                $parse_node = self::parseTreeNode($str, $handler);
+                $parse_node = self::parseTreeNode($path, $handler);
                 $child_node = $parse_node[1];
                 self::setTreeNodeByCallStack($child_node, $stack);
-                $str = '';
+                $path = '';
                 break;
             }
         }
-        if ($str !== '') {
-            $child_node = self::parseTreeNode($str, $handler);
-            $node['children'][$child_node[0]] = $child_node[1];
-            self::setTreeNodeByCallStack($node, $stack);
+        if ($path !== '') {
+            $child_node = self::parseTreeNode($path, $handler);
+            $node->children[$child_node[0]] = $child_node[1];
         }
     }
 
     /**
-     * @param array $node
+     * @param object $node
      * @param array $stack 调用栈 eg:['GET', 'i', '/', '$']
      */
-    protected static function setTreeNodeByCallStack(array $node, array $stack)
+    protected static function setTreeNodeByCallStack(object $node, array $stack)
     {
-        $type = $stack[0];
-        if (count($stack) === 1) {
-            self::$tree[$type]['children'] = $node['children'];
-            return;
+        $search = &self::$tree[$stack[0]];
+        array_shift($stack);
+        foreach ($stack as $k) {
+            $search = &$search->children[$k];
         }
-        $node_point = &self::$tree[$type];
-        for ($i = 1; $i < count($stack); $i++) {
-            $node_point = &$node_point['children'][$stack[$i]];
-        }
-        $node_point = $node;
+        $search = $node;
     }
 
     /**
@@ -172,54 +159,47 @@ class Route
      */
     protected static function parseTreeNode(string $path, $handler):array
     {
-        preg_match_all('/({.+?})/', $path, $matches, PREG_OFFSET_CAPTURE);
-        $path_stack = [];
-        $str_index = 0;
-        foreach ($matches[1] as $param) {
-            $str = substr($path, $str_index, $param[1] - $str_index);
-            if ($str !== '') {
-                $path_stack[] = [$str[0], $str];
-            }
-            $var_name = substr($path, $param[1]+1, strlen($param[0])-2);
-            if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_-]*$/', $var_name)) {
-                throw new \InvalidArgumentException(sprintf('Route to "%s": illegal variable name "%s"', $path, $var_name));
-            }
-            $path_stack[] = ['$', $var_name];
-            $str_index = $param[1] + strlen($param[0]);
-            if (strlen($path) > $str_index && substr($path, $str_index, 1) !== '/') {
-                throw new \InvalidArgumentException(sprintf('Route to "%s": variables must split by "/"', $path));
-            }
+        $path_slice = explode( '$', $path);
+        $key = '$';
+        if ($path_slice[0] !== '') {
+            $key = $path_slice[0][0];
+            $node = $root = self::newTreeNode($path_slice[0], [], []);
         }
-
-        if (strlen($path) > $str_index) {
-            $str = substr($path, $str_index);
-            $path_stack[] = [$str[0], $str];
-        }
-
-        $child_node = [];
-        $child_key = '';
-        for ($i = count($path_stack) - 1; $i >= 0; $i--) {
-            $node = self::generateTreeNode($path_stack[$i][1], [], []);
-            if ($child_key !== '') {
-                $node['children'][$child_key] = $child_node;
+        array_shift($path_slice);
+        foreach ($path_slice as $str) {
+            if (strpos($str, '/')) {
+                list($var_name, $next_str) = explode('/', $str, 2);
+                $next_str = '/'.$next_str;
             } else {
-                $node['handler'] = $handler;
+                $var_name = $str;
+                unset($next_str);
             }
-            $child_key = $path_stack[$i][0];
-            $child_node = $node;
+            if (isset($node)) {
+                $child_node = $node->children['$'] = self::newTreeNode($var_name, [], []);
+            } else {
+                $root = $node = $child_node = self::newTreeNode($var_name, [], []);
+            }
+            if (isset($next_str) && $next_str) {
+                $child_node = $child_node->children[$next_str[0]] = self::newTreeNode($next_str, [], []);
+            }
+            $node = $child_node;
         }
-        return [($path[0] !== '{' ? $path[0] : '$'), $child_node];
+        if (!isset($root) || !isset($node)) {
+            throw new \InvalidArgumentException(sprintf('Route to "%s": ', $path));
+        }
+        $node->handler = $handler;
+        return [$key, $root];
     }
 
     /**
      * @param string $path
-     * @param array $handler
+     * @param array $handler [class, method]
      * @param array $children
-     * @return array node
+     * @return object node 不想再加新类了
      */
-    protected static function generateTreeNode(string $path, array $handler, array $children):array
+    protected static function newTreeNode(string $path, array $handler = [], array $children = []):object
     {
-        return compact('path', 'handler', 'children');
+        return (object)compact('path', 'handler', 'children');
     }
 
     public static function get(string $path, $call)
@@ -278,48 +258,46 @@ class Route
         $res = self::$tree[strtoupper($type)];
         $str = trim($path, '/');
         $params = [];
-        //$stack = [];
         if ($res === []) return [null, null];
-        while ($res['children'] !== [] && $str !== '') {
+        while ($res->children !== [] && $str !== '') {
             $start_char = $str[0];
-            if ($node = $res['children'][$start_char] ?? false) {
-                $path_len = strlen($node['path']);
-                if (substr($str, 0, $path_len) === $node['path']) {
-                    //$stack[] = $start_char;
+            if ($node = $res->children[$start_char] ?? false) {
+                $path_len = strlen($node->path);
+                if (substr($str, 0, $path_len) === $node->path) {
                     $res = $node;
                     $str = substr($str, $path_len);
                     continue;
                 }
             }
-            if ($node = $res['children']['$'] ?? false) {
+            if ($node = $res->children['$'] ?? false) {
                 // 暂定参数后只能接 /
-                $var_name = $node['path'];
-                if ($after_node = $node['children']['/'] ?? false) {
+                $var_name = $node->path;
+                if ($after_node = $node->children['/'] ?? false) {
                     $pos = strpos($str, '/');
                     if ($pos) {
                         $param = substr($str, 0, $pos);
                         $after_pa = substr($str, $pos);
-                        $path_len = strlen($after_node['path']);
-                        if (substr($after_pa, 0, $path_len) === $after_node['path']) {
-                            // 截取实际传递的到 / 位置的参数
-                            // $stack[] = '$';
-                            // $stack[] = '/';
-                            $params[$var_name] = $param;
+                        $path_len = strlen($after_node->path);
+                        if (substr($after_pa, 0, $path_len) === $after_node->path) {
+                            // 相同参数使用'/'分割
+                            foreach (explode('/', $var_name) as $name) {
+                                $params[$name] = $param;
+                            }
                             $res = $after_node;
                             $str = substr($after_pa, $path_len);
                             continue;
                         }
                     }
                 }
-                // 将剩余部分作为参数传入
-                $params[$var_name] = $str;
-                // $stack[] = '$';
+                foreach (explode('/', $var_name) as $name) {
+                    $params[$name] = $str;
+                }
                 $res = $node;
                 $str = '';
             }
             break;
         }
-        $handler = $res['handler'];
+        $handler = $res->handler;
         if ($handler !== [] && $str === '') {
             return [$handler, $params];
         }

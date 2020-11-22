@@ -22,11 +22,10 @@ location / {
 require __DIR__ . './vendor/autoload.php';
 
 use kicoe\core\Link;
-use kicoe\core\Response;
 
 $link = new Link();
-$link->route('/hello/{word}', function (Response $response, string $word) {
-    return $response->text("hello ".$word);
+$link->route('/hello/{word}', function (string $word) {
+    return "hello ".$word;
 });
 
 $link->start();
@@ -37,50 +36,51 @@ $link->start();
 新版本框架源于自己一次写的快速路由前缀树实现, 总之就是非常快！(要是能配合 swoole 的话...)
 
 ```php
-Route::get('/art/{id}', 'Article@detail');
+Route::get('/art/{page}', 'Article@list');
 Route::get('/art/{id}/comments', 'Comment@list');
-Route::get('/art/list', 'Article@list');
+Route::get('/art/detail/{id}', 'Article@detail');
 ```
 
 上面的 route 定义将被解析成以下结构:
 
-```php
-[
-    'GET' => [
-        'path' => '/',
-        'handler' => [],
-        'children' => [
-            'a' => [
-                'path' => 'art/',
-                'handler' => [],
-                'children' => [
-                    '$' => [
-                        'path' => 'id',
-                        'handler' => ['Article', 'detail'],
-                        'children' => [
-                            'c' => [
-                                'path' => 'comments',
-                                'handler' => ['Comment', 'list'],
-                                'children' => []
-                            ]
-                        ],
-                    ],
-                    'l' => [
-                        'path' => 'list',
-                        'handler' => ['Article', 'list'],
-                        'children' => [],
-                    ]
-                ]
-            ]
-        ]
-    ]
-];
+```json
+{
+    "GET": {
+        "path": "/",
+        "handler": [],
+        "children": {
+            "a": {
+                "path": "art/",
+                "handler": [],
+                "children": {
+                    "$": {
+                        "path": "page/id",
+                        "handler": ["Article", "list"],
+                        "children": {
+                            "c": {
+                                "path": "comments",
+                                "handler": ["Comment", "list"],
+                                "children": []
+                            }
+                        }
+                    },
+                    "d": {
+                        "path": "detail/",
+                        "handler": [],
+                        "children": {
+                            "$": {
+                                "path": "id",
+                                "handler": ["Article", "detail"],
+                                "children": []
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 ```
-
-和一般的路由前缀树相比优点:
-
-1. 纯数组实现占用空间小
-2. 每个字典元素开头字符作为key，hash一次便能知道下一节点走向
 
 ### Routing
 
@@ -297,7 +297,7 @@ $link = new Link([
 
 // 可以直接执行 sql
 DB::select('select id from article where id in (?) and status = ?', [1, 2, 3], 2);
-DB::insert('insert into article(title) values (?),(?)', 'f', 'l');
+DB::insert('insert into article(title, status) values (?,?),(?,?)', 'first', 1, 'sec**', 3);
 ...
 ```
 
@@ -328,7 +328,7 @@ DB::insert('insert into article(title) values (?),(?)', 'f', 'l');
  * @method int delete()
  * @method int update(array $data)
  * @method static int insert(...$data)
- * @method static self fetchById($id)
+ * @method static static fetchById($id)
  */
 class Model
 ```
