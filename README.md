@@ -33,7 +33,7 @@ $link->start();
 
 ## Route
 
-新版本框架源于自己一次写的快速路由前缀树实现, 总之就是非常快！(要是能配合 swoole 的话...)
+新版本框架源于自己一次写的快速路由前缀树实现, 总之就是非常快！[:zap:swoole版本](https://github.com/moonprism/kicoephp-src/tree/swoole)
 
 ```php
 Route::get('/art/{page}', 'Article@list');
