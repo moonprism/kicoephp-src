@@ -1,6 +1,6 @@
 # kicoephp
 
-一个非常简单小巧 (仅由9个核心类组成) 的 php7.4 web 框架.
+一个非常简单小巧 (仅由9个核心类组成) 的 php web 框架.
 
 ## Install
 
@@ -181,55 +181,13 @@ $link->start();
 
 > 类似于 java 开发中的 `DTO` 与 `VO`
 
-自定义渲染层:
-
-```php
-class ViewResponse extends \kicoe\core\Response
-{
-    protected string $view_path;
-    protected string $view_file;
-    protected array $view_vars = [];
-
-    public function __construct()
-    {
-        $config = \kicoe\core\Link::make(\kicoe\core\Config::class);
-        $this->view_path = $config->get('space.view');
-    }
-
-    public function send()
-    {
-        // 可以引用各种语法解析库
-        $view_file = $this->view_path.$this->view_file.'.php';
-        if (!file_exists($view_file)) {
-            throw new \Exception(sprintf('view file "%s" not exists', $view_file));
-        }
-        extract((array)$this, EXTR_SKIP);
-        extract($this->view_vars, EXTR_SKIP);
-
-        $this->_body = include $view_file;
-        parent::send();
-    }
-
-    public function view(string $path, array $vars = [])
-    {
-        $this->view_file = $path;
-        if ($vars !== []) {
-            $this->view_vars = $vars;
-        }
-        return $this;
-    }
-}
-```
-
-以下是一段示例:
-
 ```php
 <?php
 $link = new \kicoe\core\Link();
 
 class CommentRequest extends \kicoe\core\Request
 {
-    public int $art_id;
+    // 没有默认值的属性将作为必要参数
     public int $to_id = 0;
     public string $name;
     public string $email;
@@ -245,7 +203,10 @@ class CommentRequest extends \kicoe\core\Request
         $this->email = htmlspecialchars($this->email);
         $this->link = htmlspecialchars($this->link);
         $this->content = htmlspecialchars($this->content);
-        if (!preg_match('/^([A-Za-z0-9_\-\.])+\@([A-Za-z0-9_\-\.])+\.([A-Za-z]{2,4})$/', $this->email)) {
+        if (!preg_match(
+            '/^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,})$/',
+            $this->email
+        )) {
             return 'email 格式错误';
         }
         return '';
@@ -256,7 +217,7 @@ class ApiResponse extends \kicoe\core\Response
 {
     public int $code = 200;
     public string $message = '';
-    /** @var CommentItem[] */
+    /** @var Comment[] */
     public array $data = [];
 
     public function setBodyStatus(int $code, string $message):self
@@ -267,12 +228,15 @@ class ApiResponse extends \kicoe\core\Response
     }
 }
 
-$link->route('/{art_id}', function (CommentRequest $request, ApiResponse $response, int $art_id) {
+$link->route('/{aid}', function (CommentRequest $request, ApiResponse $response, int $aid) {
     if ($err = $request->filter()) {
         return $response->setBodyStatus(422, 'ValidationError: '.$err);
     }
-    Comment::insert($request);
-    $response->data = Comment::where('art_id', $art_id)->get();
+    Comment::insert([
+        'art_id' => $aid,
+        ... // merge request data
+    ]);
+    $response->data = Comment::where('art_id', $aid)->get();
     return $response;
 }, 'post');
 

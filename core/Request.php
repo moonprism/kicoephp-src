@@ -12,8 +12,6 @@ class Request
     protected string $_path = '';
     protected string $_url = '';
 
-    protected array $_route_params = [];
-
     public function __construct()
     {
         // query
@@ -37,17 +35,17 @@ class Request
         $this->_url = $_SERVER['HTTP_HOST'].$this->_path.($query_str ? '?'.$query_str : '');
     }
 
-    public function init(array $params)
+    public function init()
     {
-        $this->_route_params = $params;
         // 附加所有 input 到公共属性
         $ref_class = new ReflectionClass($this);
         $props = $ref_class->getProperties(\ReflectionProperty::IS_PUBLIC);
         foreach ($props as $prop) {
             $prop_name = $prop->getName();
-            if ($var = $this->input($prop_name) ?? $params[$prop_name]) {
-                $this->$prop_name = urldecode($var);
+            if (isset($this->_input[$prop_name])) {
+                $this->$prop_name = $this->input($prop_name);
             } else if (!isset($this->$prop_name)) {
+                // 没有默认值的参数没传则抛出异常
                 throw new \InvalidArgumentException(sprintf('%s property %s not exists', static::class, $prop_name));
             }
         }
@@ -63,11 +61,8 @@ class Request
         return $_SERVER['REQUEST_METHOD'];
     }
 
-    public function path(string $var_name = '', $default = false)
+    public function path()
     {
-        if ($var_name !== '') {
-            return $this->_route_params[$var_name] ?? $default;
-        }
         return $this->_path;
     }
 

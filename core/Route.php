@@ -27,7 +27,7 @@ class Route
      *         },
      *         't' => {
      *           'path' => 'test',
-     *           'handler' => ['controller2', 'method2'],
+     *           'handler' => ['controller', 'method2'],
      *           'children' => [],
      *         }
      *       ]
@@ -92,12 +92,15 @@ class Route
                     $var_end_pos = strpos($path, '/');
                     if ($var_end_pos === false) $var_end_pos = strlen($path);
                     $node->path .= '/'.substr($path, 1, $var_end_pos-1);
-                    $path = substr($path, $var_end_pos ? $var_end_pos+1 : 0);
+                    $path = substr($path, $var_end_pos ? $var_end_pos : 0);
                     continue;
                 }
                 $path_len = strlen($node->path);
                 if (substr($path, 0, $path_len) === $node->path) {
                     $path = substr($path, $path_len);
+                    if ($path === '') {
+                        $node->handler = $handler;
+                    }
                     continue;
                 } else {
                     // LCP
@@ -159,36 +162,33 @@ class Route
      */
     protected static function parseTreeNode(string $path, $handler):array
     {
-        $path_slice = explode( '$', $path);
-        $key = '$';
-        if ($path_slice[0] !== '') {
-            $key = $path_slice[0][0];
-            $node = $root = self::newTreeNode($path_slice[0], [], []);
-        }
-        array_shift($path_slice);
-        foreach ($path_slice as $str) {
-            if (strpos($str, '/')) {
-                list($var_name, $next_str) = explode('/', $str, 2);
-                $next_str = '/'.$next_str;
-            } else {
-                $var_name = $str;
-                unset($next_str);
+        $node = $root = self::newTreeNode($path);
+
+        while ($path !== '') {
+            $pos = strpos($path, '$');
+            if ($pos === false) {
+                $pos = strlen($path);
             }
-            if (isset($node)) {
-                $child_node = $node->children['$'] = self::newTreeNode($var_name, [], []);
-            } else {
-                $root = $node = $child_node = self::newTreeNode($var_name, [], []);
+            if ($node_path = substr($path, 0, $pos)) {
+                // 将开头不包含$的部分加入普通节点
+                $child_node = $node->children[$node_path[0]] = self::newTreeNode($node_path);
+                $node = $child_node;
             }
-            if (isset($next_str) && $next_str) {
-                $child_node = $child_node->children[$next_str[0]] = self::newTreeNode($next_str, [], []);
+            $path = substr($path, $pos);
+            if ($path !== '') {
+                $var_end_pos = strpos($path, '/');
+                if ($var_end_pos === false) $var_end_pos = strlen($path);
+                $var_name = substr($path, 1, $var_end_pos-1);
+                // 找到$，生成变量节点
+                $path = substr($path, $var_end_pos);
+                $child_node = $node->children['$'] = self::newTreeNode($var_name);
+                $node = $child_node;
             }
-            $node = $child_node;
-        }
-        if (!isset($root) || !isset($node)) {
-            throw new \InvalidArgumentException(sprintf('Route to "%s": ', $path));
         }
         $node->handler = $handler;
-        return [$key, $root];
+        $key = array_keys($root->children)[0];
+        $value = array_values($root->children)[0];
+        return [$key, $value];
     }
 
     /**
@@ -243,7 +243,7 @@ class Route
             $ref_class = new ReflectionClass($class_name);
             $ref_method = $ref_class->getMethod($method_name);
         } catch (ReflectionException $e) {
-            throw new \InvalidArgumentException(sprintf('Class "%s" or Function "%s" does not exist.', $class_name, $method_name));
+            throw new \InvalidArgumentException(sprintf('Handler [%s, %s] does not exist.', $class_name, $method_name));
         }
         self::addRoute($type, $path, [$ref_class->getName(), $ref_method->getName()]);
     }
@@ -255,10 +255,10 @@ class Route
      */
     public static function search(string $path, string $type = 'GET'):array
     {
-        $res = self::$tree[strtoupper($type)];
+        $res = self::$tree[strtoupper($type)] ?? null;
         $str = trim($path, '/');
         $params = [];
-        if ($res === []) return [null, null];
+        if ($res === null) return [null, null];
         while ($res->children !== [] && $str !== '') {
             $start_char = $str[0];
             if ($node = $res->children[$start_char] ?? false) {
@@ -273,8 +273,7 @@ class Route
                 // 暂定参数后只能接 /
                 $var_name = $node->path;
                 if ($after_node = $node->children['/'] ?? false) {
-                    $pos = strpos($str, '/');
-                    if ($pos) {
+                    if ($pos = strpos($str, '/')) {
                         $param = substr($str, 0, $pos);
                         $after_pa = substr($str, $pos);
                         $path_len = strlen($after_node->path);

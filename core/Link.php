@@ -48,7 +48,7 @@ class Link
         $request = new Request();
         $response = new Response();
 
-        // 路由执行
+        // 查询路由
         list($handler, $params) = Route::search($request->path(), $request->method());
         if (is_null($handler)) {
             $response->status(404);
@@ -67,6 +67,7 @@ class Link
             $ref_function = new ReflectionFunction($handler);
             $ref_parameters = $ref_function->getParameters();
         }
+
         $real_params = [];
         foreach ($ref_parameters as $parameter) {
             // 自动注入
@@ -87,7 +88,7 @@ class Link
                     $instance = new $type_name;
                 }
                 if ($instance instanceof Request) {
-                    $instance->init($params);
+                    $instance->init();
                 }
                 $real_params[] = $instance;
                 continue;
