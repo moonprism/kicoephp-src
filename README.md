@@ -360,7 +360,9 @@ use kicoe\core\Model;
 class Article extends Model
 {
     // 默认类名小写
-    protected string $_table = 'article';
+    const TABLE = 'article';
+    // 默认'id'
+    const PRIMARY_KEY = 'id';
 
     public int $id;
     public string $title;
@@ -401,10 +403,10 @@ $arts = Article::where('status', Article::STATUS_PUBLISH)
     ->orderBy('created_time', 'desc')
     ->limit(0, 10);
 
-// int count where 条件下的总数
+// int where 条件下的总数
 $count = $arts->count();
 
-// array [Article, Article]
+// array Article[]
 $article_list = $arts->get();
 ```
 

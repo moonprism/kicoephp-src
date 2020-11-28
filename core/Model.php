@@ -30,24 +30,22 @@ namespace kicoe\core;
  */
 class Model
 {
-    protected ?SQL $sql = null;
+    const TABLE = '';
+    const PRIMARY_KEY = 'id';
 
+    protected ?SQL $_sql = null;
     protected string $_table = '';
-    protected string $primary_key = 'id';
-
     protected array $_old_data = [];
 
-    public function __construct(string $table = '')
+    // todo php8 语法糖
+    public function __construct(string $_table = '')
     {
-        if ($table === '') {
-            $table = $this->_table ?: self::defaultTableName();
-        }
-        $this->_table = $table;
+        $this->_table = $_table ?: static::TABLE ?: self::defaultTableName();
     }
 
     public function getPrimaryKey()
     {
-        return $this->primary_key;
+        return static::PRIMARY_KEY;
     }
 
     public static function defaultTableName()
@@ -71,11 +69,11 @@ class Model
 
     public function sql():SQL
     {
-        if ($this->sql === null) {
-            $this->sql = new SQL();
-            $this->sql->setObj($this);
-            $this->sql->from($this->_table);
+        if ($this->_sql === null) {
+            $this->_sql = new SQL();
+            $this->_sql->setObj($this);
+            $this->_sql->from($this->_table);
         }
-        return $this->sql;
+        return $this->_sql;
     }
 }
