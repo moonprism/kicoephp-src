@@ -2,22 +2,27 @@
 
 namespace kicoe\core;
 
-use ReflectionClass;
-
 class Response
 {
     protected array $_header = [];
     protected string $_body = '';
 
+    protected \Swoole\Http\Response $_response;
+
+    public function __construct(\Swoole\Http\Response $response)
+    {
+        $this->_response = $response;
+    }
+
     public function header(string $key, string $value)
     {
-        $this->_header[] = $key . ': ' . $value;
+        $this->_response->header($key, $value);
         return $this;
     }
 
     public function status(int $code)
     {
-        $this->_header[] = 'HTTP/1.1 ' . $code;
+        $this->_response->status($code);
         return $this;
     }
 
@@ -28,7 +33,7 @@ class Response
         return $this;
     }
 
-    protected function jsonHeader()
+    public function jsonHeader()
     {
         $this->header('Content-type', 'text/json');
     }
@@ -45,14 +50,13 @@ class Response
             \header($h);
         }
         if ($this->_body === '') {
-            $ref_class = new ReflectionClass($this);
-            $props = $ref_class->getProperties(\ReflectionProperty::IS_PUBLIC);
-            if (count($props) === 0) {
-                return;
-            }
             $this->json($this);
+            if ($this->_body === '{}') {
+                // 没有public变量置空
+                $this->_body = '';
+            }
         }
-        echo $this->_body;
+        $this->_response->end($this->_body);
     }
 
     public function redirect(string $url)

@@ -12,6 +12,9 @@
             "kicoe\\core\\": "core/"
         }
     },
+    "require-dev": {
+        "phpunit/phpunit": "^9.4"
+    },
     "require": {
         "php": ">=7.4",
         "ext-json": "*"

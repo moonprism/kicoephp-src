@@ -11,21 +11,7 @@ class Link
 
     public function __construct($conf = [])
     {
-        // 读取配置信息
-        /** @var Config $config */
-        $config = self::makeWithArgs(Config::class, $conf);
-
-        // 初始化 redis
-        if ($redis_conf = $config->get('redis')) {
-            self::makeWithArgs(Cache::class, $redis_conf);
-        }
-
-        // 初始化 mysql
-        if ($mysql_conf = $config->get('mysql')) {
-            /** @var DB $db_instance */
-            $db_instance = self::makeWithArgs(DB::class, $mysql_conf);
-            DB::setInstance($db_instance);
-        }
+        self::makeWithArgs(Config::class, $conf);
 
         // 基础类型绑定
         self::bind('string', function (string $value):string {
@@ -44,15 +30,42 @@ class Link
 
     public function start()
     {
-        // todo 自定义 Request 和 Response 情况下解决多余生成
-        $request = new Request();
-        $response = new Response();
+        /** @var Config $config */
+        $config = self::make(Config::class);
 
-        // 查询路由
-        list($handler, $params) = Route::search($request->path(), $request->method());
+        $http = self::makeWithArgs(
+            Server::class,
+           $config->get('swoole.host') ?: '0.0.0.0',
+            $config->get('swoole.port') ?: 80
+        );
+        $http->set($config->get('swoole.set'));
+
+        $http->on('request', function (\Swoole\Http\Request $request, \Swoole\Http\Response $response) use ($config) {
+            if ($config->get('debug')) {
+                self::allowCors($request, $response);
+            }
+            try {
+                $this->onRequest($request, $response);
+            } catch (\Exception $e) {
+                $response->status(500);
+                if ($config->get('debug')) {
+                    // todo 详细调用栈
+                    $response->end($e->getMessage());
+                    return;
+                }
+                $response->end();
+            }
+        });
+
+        $http->start();
+    }
+
+    public function onRequest(\Swoole\Http\Request $request, \Swoole\Http\Response $response)
+    {
+        list ($handler, $params) = Route::search($request->server['request_uri'], $request->server['request_method']);
         if (is_null($handler)) {
             $response->status(404);
-            $response->send();
+            $response->end();
             return;
         }
 
@@ -84,8 +97,18 @@ class Link
                         continue;
                     }
                 } else if (class_exists($type_name)) {
+                    // 构造需要注入的类
+                    $ref_inject_class = new ReflectionClass($type_name);
+                    $ref_inject_parameters = $ref_inject_class->getConstructor()->getParameters();
                     // todo
-                    $instance = new $type_name;
+                    switch ($ref_inject_parameters[0]->getType()) {
+                        case \Swoole\Http\Request::class:
+                            $instance = new $type_name($request);
+                            break;
+                        case \Swoole\Http\Response::class:
+                            $instance = new $type_name($response);
+                            break;
+                    }
                 }
                 if ($instance instanceof Request) {
                     $instance->init();
@@ -100,14 +123,16 @@ class Link
 
         $res = call_user_func_array($handler, $real_params);
 
-        if ($res instanceof Response) {
-            $response = $res;
-        } else if (is_array($res) || is_object($res)) {
-            $response->json($res);
-        } else {
-            $response->text($res);
+        if (!$res instanceof Response) {
+            $r = new Response($response);
+            if (is_array($res) || is_object($res)) {
+                $r->json($res);
+            } else {
+                $r->text($res);
+            }
+            $res = $r;
         }
-        $response->send();
+        $res->send();
     }
 
     /**
@@ -162,5 +187,14 @@ class Link
         }
         self::bind($name, $instance);
         return $instance;
+    }
+
+    public static function allowCors(\Swoole\Http\Request $request, \Swoole\Http\Response $response)
+    {
+        $response->header('Access-Control-Allow-Origin', $request->header['origin'] ?? '');
+        $response->header('Access-Control-Allow-Methods', 'OPTIONS');
+        $response->header('Access-Control-Allow-Headers', 'x-requested-with,session_id,Content-Type,token,Origin');
+        $response->header('Access-Control-Max-Age', '86400');
+        $response->header('Access-Control-Allow-Credentials', 'true');
     }
 }
