@@ -30,7 +30,7 @@ class Request
         $props = $ref_class->getProperties(\ReflectionProperty::IS_PUBLIC);
         foreach ($props as $prop) {
             $prop_name = $prop->getName();
-            if (($var = $this->_request->header[$prop_name]) !== null) {
+            if (($var = $this->input($prop_name), null) !== null) {
                 $this->$prop_name = $var;
             } else if (!isset($this->$prop_name)) {
                 throw new \InvalidArgumentException(sprintf('%s property %s not exists', static::class, $prop_name));

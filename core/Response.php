@@ -36,6 +36,7 @@ class Response
     public function jsonHeader()
     {
         $this->header('Content-type', 'text/json');
+        return $this;
     }
 
     public function text($str)
