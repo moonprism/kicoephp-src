@@ -137,12 +137,7 @@ $link->bind('array', function (string $value):array {
 });
 
 $link->bind('bool', function (string $value):bool {
-    if ($value === 'false') {
-        return false;
-    } else if ($value === 'true') {
-        return true;
-    }
-    return false; // ??
+    return $value === 'true';
 });
 
 // 访问 /1,2,3/true 将返回　['ids' => ['1', '2', '3'], 'is_update' => true]

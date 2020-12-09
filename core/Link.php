@@ -34,16 +34,13 @@ class Link
         $config = self::make(Config::class);
 
         $http = self::makeWithArgs(
-            Server::class,
-           $config->get('swoole.host') ?: '0.0.0.0',
+            \Swoole\Http\Server::class,
+            $config->get('swoole.host') ?: '0.0.0.0',
             $config->get('swoole.port') ?: 80
         );
         $http->set($config->get('swoole.set'));
 
         $http->on('request', function (\Swoole\Http\Request $request, \Swoole\Http\Response $response) use ($config) {
-            if ($config->get('debug')) {
-                self::allowCors($request, $response);
-            }
             try {
                 $this->onRequest($request, $response);
             } catch (\Exception $e) {
@@ -189,12 +186,8 @@ class Link
         return $instance;
     }
 
-    public static function allowCors(\Swoole\Http\Request $request, \Swoole\Http\Response $response)
+    public static function parseRouteByAnnotation(string $class_name)
     {
-        $response->header('Access-Control-Allow-Origin', $request->header['origin'] ?? '');
-        $response->header('Access-Control-Allow-Methods', 'OPTIONS');
-        $response->header('Access-Control-Allow-Headers', 'x-requested-with,session_id,Content-Type,token,Origin');
-        $response->header('Access-Control-Max-Age', '86400');
-        $response->header('Access-Control-Allow-Credentials', 'true');
+        Route::parseAnnotation($class_name);
     }
 }

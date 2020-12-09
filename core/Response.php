@@ -65,4 +65,13 @@ class Response
         $this->header('Location', $url);
         return $this;
     }
+
+    public function allowCORS()
+    {
+        $this->_response->header('Access-Control-Allow-Origin', '*');
+        $this->_response->header('Access-Control-Allow-Methods', 'POST, GET, PUT, DELETE, OPTIONS');
+        $this->_response->header('Access-Control-Allow-Headers', 'x-requested-with,session_id,Content-Type,token,Origin');
+        $this->_response->header('Access-Control-Max-Age', '86400');
+        $this->_response->header('Access-Control-Allow-Credentials', 'true');
+    }
 }
