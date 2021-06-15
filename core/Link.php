@@ -38,7 +38,8 @@ class Link
             $config->get('swoole.host') ?: '0.0.0.0',
             $config->get('swoole.port') ?: 80
         );
-        $http->set($config->get('swoole.set'));
+
+        $http->set($config->get('swoole.set') ?: []);
 
         $http->on('request', function (\Swoole\Http\Request $request, \Swoole\Http\Response $response) use ($config) {
             try {
