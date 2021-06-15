@@ -70,7 +70,7 @@ Route::get('/art/detail/{id}', 'Article@detail');
                 "handler": [],
                 "children": {
                     "$": {
-                        "path": "page/id",
+                        "path": "page|id",
                         "handler": ["Article", "list"],
                         "children": {
                             "c": {

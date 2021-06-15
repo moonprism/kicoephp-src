@@ -126,7 +126,7 @@ class RouteTest extends TestCase
                     'handler' => [],
                     'children' => [
                         '$' => (object)[
-                            'path' => 'id/page',
+                            'path' => 'id|page',
                             'handler' => ['article', 'id'],
                             'children' => [
                                 '/' => (object)[
@@ -167,7 +167,7 @@ class RouteTest extends TestCase
                             'handler' => [],
                             'children' => [
                                 '$' => (object)[
-                                    'path' => 'id/page',
+                                    'path' => 'id|page',
                                     'handler' => ['article', 'id'],
                                     'children' => [
                                         '/' => (object)[
@@ -210,7 +210,7 @@ class RouteTest extends TestCase
                             'handler' => [],
                             'children' => [
                                 '$' => (object)[
-                                    'path' => 'id/page',
+                                    'path' => 'id|page',
                                     'handler' => ['article', 'id'],
                                     'children' => [
                                         '/' => (object)[
