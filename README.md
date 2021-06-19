@@ -1,6 +1,6 @@
 # kicoephp
 
-一个非常简单小巧 (仅由9个核心类组成) 的 php web 框架.
+一个非常简单小巧 (仅由9个类组成) 的 php web 框架.
 
 ## Install
 
@@ -54,7 +54,7 @@ Route::get('/art/detail/{id}', 'Article@detail');
                 "handler": [],
                 "children": {
                     "$": {
-                        "path": "page/id",
+                        "path": "page|id",
                         "handler": ["Article", "list"],
                         "children": {
                             "c": {
@@ -228,6 +228,7 @@ class ApiResponse extends \kicoe\core\Response
     }
 }
 
+// 自动注入Request和Response对象
 $link->route('/{aid}', function (CommentRequest $request, ApiResponse $response, int $aid) {
     if ($err = $request->filter()) {
         return $response->setBodyStatus(422, 'ValidationError: '.$err);
@@ -237,10 +238,19 @@ $link->route('/{aid}', function (CommentRequest $request, ApiResponse $response,
         ... // merge request data
     ]);
     $response->data = Comment::where('art_id', $aid)->get();
+    // {"code":200,"message":"","data":[{...}]}
     return $response;
 }, 'post');
 
-$link->start();
+try {
+    $link->start();
+} catch (Exception $e) {
+    // 根据实际注入的Response来处理异常
+    $response = Link::make(\kicoe\core\Response);
+    if ($response instanceof ApiResponse) {
+        $response->setBodyStatus(500, $e->getMessage())->send();
+    }
+}
 ```
 
 ## DB
@@ -261,7 +271,7 @@ $link = new Link([
 
 // 可以直接执行 sql
 DB::select('select id from article where id in (?) and status = ?', [1, 2, 3], 2);
-DB::insert('insert into article(title, status) values (?,?),(?,?)', 'first', 1, 'sec**', 3);
+DB::insert('insert into article(title, status) values (?,?), (?)', 'first', 1, ['second', 2]);
 ...
 ```
 
@@ -420,7 +430,7 @@ foreach ($articles as $article) {
 }
 ```
 
-以上代码执行 sql 过多是一个问题，更重要的是框架中用来判断 `Model` 是否更新的原字段信息存在一个不是用构造函数初始化的属性中(所谓延迟)，单纯的 `fetchAll()` 无法初始化这个属性，导致更新 sql 语句里会带上所有不为 uninitialized 的字段。
+以上代码执行 sql 过多是一个问题，还有就是框架中用来判断 `Model` 是否更新的原字段信息存在一个不是用构造函数初始化的属性中(所谓延迟)，单纯的 `PDO::fetchAll()` 无法初始化这个属性，导致更新 sql 语句里会带上所有不为 uninitialized 的字段。
 
 虽然可能是设计缺陷，最好还是转成以下更常规的更新方式:
 

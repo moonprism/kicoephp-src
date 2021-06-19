@@ -44,15 +44,16 @@ class Link
 
     public function start()
     {
-        // todo 自定义 Request 和 Response 情况下解决多余生成
         $request = new Request();
         $response = new Response();
+
+        self::bind(Request::class, $request);
+        self::bind(Response::class, $response);
 
         // 查询路由
         list($handler, $params) = Route::search($request->path(), $request->method());
         if (is_null($handler)) {
-            $response->status(404);
-            $response->send();
+            $response->status(404)->send();
             return;
         }
 
@@ -84,11 +85,15 @@ class Link
                         continue;
                     }
                 } else if (class_exists($type_name)) {
-                    // todo
                     $instance = new $type_name;
-                }
-                if ($instance instanceof Request) {
-                    $instance->init();
+                    if ($instance instanceof Request) {
+                        self::bind(Request::class, $instance);
+                        $instance->init();
+                    } else if ($instance instanceof Response) {
+                        self::bind(Response::class, $instance);
+                    } else {
+                        self::bind($type_name, new $type_name);
+                    }
                 }
                 $real_params[] = $instance;
                 continue;
@@ -154,9 +159,9 @@ class Link
                 $class = $instance;
                 $instance = new $class(...$args);
                 self::bind($class, $instance);
-            } /** else {
-                throw new \Exception();
-            } */
+            } else {
+                throw new \Exception('make failed', 500);
+            }
         } else {
             $instance = new $name(...$args);
         }

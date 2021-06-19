@@ -91,7 +91,7 @@ class Route
                     // 变量直接匹配
                     $var_end_pos = strpos($path, '/');
                     if ($var_end_pos === false) $var_end_pos = strlen($path);
-                    $node->path .= '/'.substr($path, 1, $var_end_pos-1);
+                    $node->path .= '|'.substr($path, 1, $var_end_pos-1);
                     $path = substr($path, $var_end_pos ? $var_end_pos : 0);
                     continue;
                 }
@@ -278,8 +278,8 @@ class Route
                         $after_pa = substr($str, $pos);
                         $path_len = strlen($after_node->path);
                         if (substr($after_pa, 0, $path_len) === $after_node->path) {
-                            // 相同参数使用'/'分割
-                            foreach (explode('/', $var_name) as $name) {
+                            // 相同参数使用'|'分割
+                            foreach (explode('|', $var_name) as $name) {
                                 $params[$name] = $param;
                             }
                             $res = $after_node;
@@ -288,7 +288,7 @@ class Route
                         }
                     }
                 }
-                foreach (explode('/', $var_name) as $name) {
+                foreach (explode('|', $var_name) as $name) {
                     $params[$name] = $str;
                 }
                 $res = $node;

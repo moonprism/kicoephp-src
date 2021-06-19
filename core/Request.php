@@ -8,12 +8,20 @@ class Request
 {
     protected array $_query = [];
     protected array $_input = [];
+    protected array $_header = [];
 
     protected string $_path = '';
     protected string $_url = '';
 
     public function __construct()
     {
+        // header
+        foreach ($_SERVER as $key => $value) {
+            if (substr($key, 0, 5) === 'HTTP_') {
+                $this->_header[str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($key, 5)))))] = $value;
+            }
+        }
+
         // query
         $url_data = parse_url($_SERVER['REQUEST_URI']);
         if ($query_str = $url_data['query'] ?? false) {
@@ -24,7 +32,7 @@ class Request
         // path
         $this->_path = urldecode($url_data['path']);
 
-        // all input
+        // input
         if ($this->isJson()) {
             $this->_input = array_merge($this->_input, json_decode(file_get_contents('php://input'), true));
         } else if ($this->method() === 'POST') {
@@ -53,12 +61,12 @@ class Request
 
     public function isJson():bool
     {
-        return substr($_SERVER['CONTENT_TYPE'], -4) === 'json';
+        return isset($_SERVER['CONTENT_TYPE']) && substr($_SERVER['CONTENT_TYPE'], -4) === 'json';
     }
 
     public function method():string
     {
-        return $_SERVER['REQUEST_METHOD'];
+        return $_SERVER['REQUEST_METHOD'] ?? '';
     }
 
     public function path()
@@ -69,6 +77,11 @@ class Request
     public function url()
     {
         return $this->_url;
+    }
+
+    public function header(string $key, $default = false)
+    {
+        return $this->_header[$key] ?? $default;
     }
 
     public function query(string $key, $default = false)
