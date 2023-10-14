@@ -28,6 +28,7 @@ namespace kicoe\core;
  * @method static int insert(...$data)
  * @method static static fetchById($id)
  */
+#[\AllowDynamicProperties]
 class Model
 {
     const TABLE = '';
